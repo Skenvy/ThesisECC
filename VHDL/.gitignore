@@ -2,6 +2,7 @@
 *.bgn
 *.bit
 *.bld
+*.bmm
 *.cmd_log
 *.drc
 *.ll
@@ -66,3 +67,14 @@ xlnx_auto_0_xdb/
 xst/
 _ngo/
 _xmsgs/
+isim/
+netgen/
+
+# Other
+fuse*
+*.sym
+*.wcfg
+*.ini
+*.log
+*.exe
+*.wdb
