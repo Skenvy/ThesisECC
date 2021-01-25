@@ -27,10 +27,7 @@
 --------------------------------------------------------------------------------
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
- 
--- Uncomment the following library declaration if using
--- arithmetic functions with Signed or Unsigned values
---USE ieee.numeric_std.ALL;
+use work.VECTOR_STANDARD.ALL;
  
 ENTITY STRUC_UTIL_RAM_256_TEST IS
 END STRUC_UTIL_RAM_256_TEST;
@@ -40,56 +37,72 @@ ARCHITECTURE behavior OF STRUC_UTIL_RAM_256_TEST IS
     -- Component Declaration for the Unit Under Test (UUT)
  
     COMPONENT STRUC_UTIL_RAM_256
+	 Generic (N : natural);
     PORT(
-         WE : IN  std_logic;
-         RE : IN  std_logic;
-         Data : INOUT  std_logic_vector(255 downto 0)
+         RW : IN  std_logic;
+         Data : INOUT  std_logic_vector((VecLen-1) downto 0);
+			CLK : in STD_LOGIC
         );
     END COMPONENT;
     
 
    --Inputs
-   signal WE : std_logic := '0';
-   signal RE : std_logic := '0';
-	signal trap : std_logic_vector(255 downto 0);
+   signal RW : std_logic := '0';
+	signal trap : std_logic_vector((VecLen-1) downto 0);
+	signal CLK : std_logic := '0';
+	
 	--BiDirs
-   signal Data : std_logic_vector(255 downto 0);
-   -- No clocks detected in port list. Replace <clock> below with 
-   -- appropriate port name 
+   signal Data : std_logic_vector((VecLen-1) downto 0);
+   
+	-- Clock period definitions
+   constant CLK_period : time := 30 ns;
  
 BEGIN
- 
+	
 	-- Instantiate the Unit Under Test (UUT)
-   uut: STRUC_UTIL_RAM_256 PORT MAP (
-          WE => WE,
-          RE => RE,
-          Data => Data
+   uut: STRUC_UTIL_RAM_256 Generic Map (N => VecLen) 
+			PORT MAP (
+          RW => RW,
+          Data => Data,
+			 CLK => CLK
         );
+		  
+	-- Clock process definitions
+   CLK_process :process
+   begin
+		CLK <= '0';
+		wait for CLK_period/2;
+		CLK <= '1';
+		wait for CLK_period/2;
+   end process;
 
    stim_proc: process
-   begin	
-      wait for 10 ns;	
+   begin
+		Data <= X"0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000";
+		RW <= '0';
+      wait for CLK_period*4;	
 		Data <= X"0000_FFFF_0000_0001_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF";
-		WE <= '0';
-		RE <= '0';
-		wait for 10 ns;
+		RW <= '0';
+		wait for CLK_period*4;
 		Data <= X"0000_FFFF_0000_0001_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF";
-		WE <= '1';
-		RE <= '0';
-		wait for 10 ns;
+		RW <= '1';
+		wait for CLK_period*4;
 		Data <= X"FFFF_0000_0000_0001_0000_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF";
-		WE <= '0';
-		RE <= '1';
-		wait for 10 ns;
+		RW <= '0';
+		wait for CLK_period*4;
+		Data <= X"FFFF_0000_0000_0001_AAAA_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF";
+		RW <= '0';
+		wait for CLK_period*4;
+		Data <= X"FFFF_0000_0000_0001_0000_0000_0000_DDDD_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF";
+		RW <= '0';
+		wait for CLK_period*4;
 		Data <= (others => 'Z');
-		WE <= '0';
-		RE <= '1';
+		RW <= '0';
 		trap <= Data;
-		wait for 10 ns;
+		wait for CLK_period*4;
 		Data <= (others => 'Z');
 		trap <= Data;
-		WE <= '0';
-		RE <= '1';
+		RW <= '0';
       wait;
 		
    end process;
