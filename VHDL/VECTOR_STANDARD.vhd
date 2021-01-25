@@ -20,7 +20,8 @@ constant ZeroVector : STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := (others => '0'
 constant UnitVector : STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := (0 => '1', others => '0');
 --A VecLen bit vector populated by only 'Z's, to drive a high impedence.
 constant ImpedeVector : STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := (others => 'Z');
-
+--Used in determining the terminal length of multipliers.
+constant MultLen : natural := 16;
 
 end VECTOR_STANDARD;
 

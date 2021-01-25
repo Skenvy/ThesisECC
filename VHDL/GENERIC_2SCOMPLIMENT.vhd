@@ -38,6 +38,7 @@ end component;
 
 signal CTemp : STD_LOGIC_VECTOR (N downto 0);
 signal AINV : STD_LOGIC_VECTOR ((N-1) downto 0);
+constant InternalUnitVector : STD_LOGIC_VECTOR ((N-1) downto 0) := (0 => '1', others => '0');
 
 begin
 
@@ -46,7 +47,7 @@ AINV <= (not A);
 X : GENERIC_FAP_LINADDRMUX
 		Generic map (N => N)
 		Port map ( A => AINV,
-					  B => UnitVector,
+					  B => InternalUnitVector,
 					  S => CTemp);
 
 C <= CTemp((N-1) downto 0);

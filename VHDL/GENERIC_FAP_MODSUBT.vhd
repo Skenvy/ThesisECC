@@ -22,7 +22,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use work.VECTOR_STANDARD.ALL;
 
 entity GENERIC_FAP_MODSUBT is
-    Generic (N : natural := VecLen);
+    Generic (N : natural := VecLen;
+				 M : natural := MultLen);
     Port ( Minuend : in  STD_LOGIC_VECTOR ((N-1) downto 0);
            Subtrahend : in  STD_LOGIC_VECTOR ((N-1) downto 0);
 			  Modulus : in  STD_LOGIC_VECTOR ((N-1) downto 0); --Modulo.
@@ -32,7 +33,8 @@ end GENERIC_FAP_MODSUBT;
 architecture Behavioral of GENERIC_FAP_MODSUBT is
 
 component GENERIC_FAP_LINADDRMUX
-	 Generic (N : natural);
+	 Generic (N : natural;
+				 M : natural);
     Port ( A : in  STD_LOGIC_VECTOR ((N-1) downto 0);
            B : in  STD_LOGIC_VECTOR ((N-1) downto 0);
            S : out  STD_LOGIC_VECTOR (N downto 0));
@@ -76,7 +78,7 @@ Relator : GENERIC_FAP_RELATIONAL
 					G => Great);
 
 MinandSubtrMap : GENERIC_FAP_LINADDRMUX
-	 Generic map (N => N)
+	 Generic map (N => N, M => M)
     Port  map ( A => Minuend,
 					 B => Modulus,
 					 S => MinuendAndModulus);
@@ -87,7 +89,7 @@ begin
 end generate FinalsGen;
 
 MinsubSubtrMap : GENERIC_FAP_LINADDRMUX
-	 Generic map (N => N)
+	 Generic map (N => N, M => M)
     Port  map ( A => FinalIn,
 					 B => SubtrahendInv,
 					 S => DInternal);

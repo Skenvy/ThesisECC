@@ -22,7 +22,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use work.VECTOR_STANDARD.ALL;
 
 entity GENERIC_FAP_LINADDRMUX is
-	 Generic (N : natural := VecLen);
+	 Generic (N : natural := VecLen;
+				 M : natural := MultLen); --Terminal Length
     Port ( A : in  STD_LOGIC_VECTOR ((N-1) downto 0);
            B : in  STD_LOGIC_VECTOR ((N-1) downto 0);
            S : out  STD_LOGIC_VECTOR (N downto 0));
@@ -31,7 +32,8 @@ end GENERIC_FAP_LINADDRMUX;
 architecture Behavioral of GENERIC_FAP_LINADDRMUX is
 
 component GENERIC_FAP_LINADDRMUX_INTERNALRCA
-	 Generic (N : natural);
+	 Generic (N : natural;
+				 M : natural); --Terminal Length
     Port ( A : in  STD_LOGIC_VECTOR ((N-1) downto 0);
            B : in  STD_LOGIC_VECTOR ((N-1) downto 0);
            Cin : in  STD_LOGIC;
@@ -42,7 +44,7 @@ end component;
 begin
 
 X : GENERIC_FAP_LINADDRMUX_INTERNALRCA
-		Generic map (N => N)
+		Generic map (N => N, M => M)
 		Port map (A => A, B => B, Cin => '0', S => S((N-1) downto 0), Cout => S(N));
 
 end Behavioral;
