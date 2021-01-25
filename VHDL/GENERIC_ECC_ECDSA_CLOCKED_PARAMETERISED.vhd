@@ -161,7 +161,7 @@ component GENERIC_UTIL_RAM_CLOCKED
 end component;
 
 signal DATABUSIN : STD_LOGIC_VECTOR (((2*N)-1) downto 0);
-
+signal CLK_QUAD : STD_LOGIC_VECTOR (1 downto 0) := "00";
 
 ----------------------
 --PM and Inverter IO--
@@ -175,8 +175,9 @@ signal PM_AQY : STD_LOGIC_VECTOR ((N-1) downto 0);
 signal PM_Modulus : STD_LOGIC_VECTOR ((N-1) downto 0);
 signal PM_ECC_A : STD_LOGIC_VECTOR ((N-1) downto 0);
 signal PM_StableOutput : STD_LOGIC;
-signal INV_ELEMENT : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal INV_ELEMENT : STD_LOGIC_VECTOR ((N-1) downto 0) := UnitVector;
 signal INV_INVERSE : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal INV_MODULUS : STD_LOGIC_VECTOR ((N-1) downto 0) := (1 => '1', others => '0');
 signal DSA_INVERSE : STD_LOGIC_VECTOR ((N-1) downto 0); --Holds the output from the port map
 signal INV_INVERSE_STABLE : STD_LOGIC;
 
@@ -213,11 +214,13 @@ signal DSA_PA_GwQ_Y : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTU_A : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTU_B : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTU_P : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal DSA_MULTU_M : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_U : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTU_STABLE : STD_LOGIC;
 signal DSA_MULTV_A : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTV_B : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTV_P : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal DSA_MULTV_M : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_V : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTV_STABLE : STD_LOGIC;
 signal DSA_ADDRW_A : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
@@ -538,7 +541,7 @@ inverter : GENERIC_FAP_MODINVR_CLOCKED
 				 AddrDelay => AddrDelay)
     Port Map ( Element => INV_ELEMENT,
            Inverse => INV_INVERSE,
-			  Modulus => DATA_Curve_N,
+			  Modulus => INV_MODULUS,
 			  CLK => CLK);
 			  
 inverter_stability : GENERIC_FAP_RELATIONAL
@@ -577,7 +580,7 @@ multv : GENERIC_FAP_MODMULT_CLOCKEDCOMBS_TOOMCOOK
 				 Toomed => Toomed)
     Port Map ( MultiplicandA => DSA_MULTV_A,
            MultiplicandB => DSA_MULTV_B,
-			  Modulus => DATA_Curve_N,
+			  Modulus => DSA_MULTV_M,
            Product => DSA_MULTV_P,
 			  CLK => CLK,
 			  StableOutput => DSA_MULTV_STABLE);
@@ -590,7 +593,7 @@ multu : GENERIC_FAP_MODMULT_CLOCKEDCOMBS_TOOMCOOK
 				 Toomed => Toomed)
     Port Map ( MultiplicandA => DSA_MULTU_A,
            MultiplicandB => DSA_MULTU_B,
-			  Modulus => DATA_Curve_N,
+			  Modulus => DSA_MULTU_M,
            Product => DSA_MULTU_P,
 			  CLK => CLK,
 			  StableOutput => DSA_MULTU_STABLE);
@@ -707,6 +710,7 @@ begin
 						STABILITY_ECDSA_SGA <= '1';
 						DATABUSIN <= Signature_R & DSA_U; --DATA_Signature_R --DATA_Signature_S
 						OP_PHASELOCK <= "00";
+						CLK_QUAD <= "00";
 					else
 						STABILITY_ECDSA_ROUNDS <= (others => '0');
 					end if;
@@ -714,50 +718,88 @@ begin
 					--Assert Signature_S != 0 (Recompute Signature_K otherwise)
 					--SETUP INPUTS
 					SIGNATURE_STABLILITY_CHECK <= DSA_U;
-					STABILITY_ECDSA_ROUNDS(15) <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(15) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(13) = '1') then
 					--Compute (MULT) Signature_S = (Signature_K * (E + (Key_Private * Signature_R))) mod Curve_N
 					--CAPTURE OUTPUTS
 					if ((DSA_MULTU_STABLE) = '1') then
 						DSA_U <= DSA_MULTU_P; --DSA_U now contains Signature_S
 						STABILITY_ECDSA_ROUNDS(14) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(12) = '1') then
 					--Compute (MULT) Signature_S = (Signature_K * (E + (Key_Private * Signature_R))) mod Curve_N
 					--SETUP INPUTS
-					DSA_MULTU_A <= DATA_Signature_K;
+					DSA_MULTU_A <= DSA_INVERSE;
 					DSA_MULTU_B <= DSA_W;
-					STABILITY_ECDSA_ROUNDS(13) <= '1';
+					DSA_MULTU_M <= DATA_Curve_N;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(13) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(11) = '1') then
 					--Compute (ADDR) (E + (Key_Private * Signature_R)) mod Curve_N
 					--CAPTURE OUTPUTS
 					DSA_W <= DSA_ADDRW_S; --DSA_W is now (E + (Key_Private * Signature_R))
 					STABILITY_ECDSA_ROUNDS(12) <= '1';
+					CLK_QUAD <= "00";
 				elsif (STABILITY_ECDSA_ROUNDS(10) = '1') then
 					--Compute (ADDR) (E + (Key_Private * Signature_R)) mod Curve_N
 					--SETUP INPUTS
 					DSA_ADDRW_A <= DATA_HASH_Total;
 					DSA_ADDRW_B <= DSA_V;
-					STABILITY_ECDSA_ROUNDS(11) <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(11) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(9) = '1') then
 					--Compute (MULT) (Key_Private * Signature_R) mod Curve_N
 					--CAPTURE OUTPUTS
 					if ((DSA_MULTV_STABLE) = '1') then
 						DSA_V <= DSA_MULTV_P;
 						STABILITY_ECDSA_ROUNDS(10) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(8) = '1') then
 					--Compute (MULT) (Key_Private * Signature_R) mod Curve_N
 					--SETUP INPUTS
 					DSA_MULTV_A <= DATA_Key_Private;
 					DSA_MULTV_B <= SIGNATURE_R;
-					STABILITY_ECDSA_ROUNDS(9) <= '1';
+					DSA_MULTV_M <= DATA_Curve_N;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(9) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(7) = '1') then
 					--Assert Signature_R != 0 (Recompute Signature_K otherwise)
 					--CAPTURE OUTPUTS
 					if ((not SIGNATURE_STABLE) = '1') then --for 'Not' Equal ZeroVector
 						STABILITY_ECDSA_ROUNDS(8) <= '1';
 						SIGNATURE_R <= DSA_W;
+						CLK_QUAD <= "00";
 					else
 						STABILITY_ECDSA_ROUNDS <= (others => '0');
 					end if;
@@ -765,17 +807,35 @@ begin
 					--Assert Signature_R != 0 (Recompute Signature_K otherwise)
 					--SETUP INPUTS
 					SIGNATURE_STABLILITY_CHECK <= DSA_W;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(7) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(5) = '1') then
 					--Compute Signature_R = (Signature_K * G).X mod Curve_N
 					--CAPTURE OUTPUTS
 					DSA_W <= DSA_ADDRW_S; --DSA_W is now Signature_R
 					STABILITY_ECDSA_ROUNDS(6) <= '1';
+					CLK_QUAD <= "00";
 				elsif (STABILITY_ECDSA_ROUNDS(4) = '1') then
 					--Compute Signature_R = (Signature_K * G).X mod Curve_N
 					--SETUP INPUTS
 					DSA_ADDRW_A <= DSA_PM_ByG_X;
 					DSA_ADDRW_B <= ZeroVector;
-					STABILITY_ECDSA_ROUNDS(5) <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(5) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(3) = '1') then
 					--Compute 1 PM (over Curve) of (Signature_K * G)
 					--CAPTURE OUTPUTS
@@ -783,6 +843,7 @@ begin
 						DSA_PM_ByG_X <= PM_AQX;
 						DSA_PM_ByG_Y <= PM_AQY;
 						STABILITY_ECDSA_ROUNDS(4) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(2) = '1') then
 					--Compute 1 PM (over Curve) of (Signature_K * G)
@@ -792,22 +853,41 @@ begin
 					PM_APY <= DATA_Curve_GY;
 					PM_Modulus <= DATA_Curve_Prime;
 					PM_ECC_A <= DATA_Curve_A;
-					STABILITY_ECDSA_ROUNDS(3) <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(3) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(1) = '1') then
 					--Compute Inverse (over Curve_N) of Signature_K
 					--CAPTURE OUTPUTS
-					if (INV_INVERSE_STABLE = '1') then
+					if (INV_INVERSE_STABLE = '0') then
 						DSA_INVERSE <= INV_INVERSE;
 						STABILITY_ECDSA_ROUNDS(2) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(0) = '1') then
 					--Compute Inverse (over Curve_N) of Signature_K
 					--SETUP INPUTS
 					INV_ELEMENT <= DATA_Signature_K;
-					STABILITY_ECDSA_ROUNDS(1) <= '1';
+					INV_MODULUS <= DATA_Curve_N;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(1) <= '1';
+					end if;
 				else
 					--Take E from DATA_HASH_Total
 					--Take Signature_K from DATA_Signature_K
+					CLK_QUAD <= "00";
 					STABILITY_ECDSA_ROUNDS(0) <= '1';
 				end if;
 			elsif ((Command(1) and Command(0)) = '1') then
@@ -822,22 +902,40 @@ begin
 					--CAPTURE OUTPUTS
 					SIGNATURE_VERIFIED <= SIGNATURE_VERIFY;
 					STABILITY_ECDSA_SVA <= '1';
+					CLK_QUAD <= "00";
 				elsif (STABILITY_ECDSA_ROUNDS(20) = '1') then
 					--Assert that r = w (if yes, then success)
 					--SETUP INPUTS
 					--Inputs are fixed to the DSA_W and DATA_Signature_R registers, hold one round of the STABILITY_ECDSA to let Relator stabilise
-					STABILITY_ECDSA_ROUNDS(21) <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(21) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(19) = '1') then
 					--Compute w = (uG+vQ).X mod Curve_N
 					--CAPTURE OUTPUTS
 					DSA_W <= DSA_ADDRW_S;
 					STABILITY_ECDSA_ROUNDS(20) <= '1';
+					CLK_QUAD <= "00";
 				elsif (STABILITY_ECDSA_ROUNDS(18) = '1') then
 					--Compute w = (uG+vQ).X mod Curve_N
 					--SETUP INPUTS
 					DSA_ADDRW_A <= DSA_U;
 					DSA_ADDRW_B <= ZeroVector;
-					STABILITY_ECDSA_ROUNDS(19) <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(19) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(17) = '1') then
 					--Compute APX and APY (over Curve) between uG and vQ
 					--CAPTURE OUTPUTS
@@ -845,53 +943,94 @@ begin
 						DSA_V <= DSA_MULTV_P; --DSA_V now contains APY
 						DSA_U <= DSA_MULTU_P; --DSA_U now contains APX
 						STABILITY_ECDSA_ROUNDS(18) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(16) = '1') then
 					--Compute APX and APY (over Curve) between uG and vQ
 					--SETUP INPUTS
 					DSA_MULTU_A <= DSA_JQX;
 					DSA_MULTU_B <= DSA_JQZ_INV_SQUARED;
+					DSA_MULTU_M <= DATA_Curve_Prime;
 					DSA_MULTV_A <= DSA_JQY;
 					DSA_MULTV_B <= DSA_JQZ_INV_CUBED;
-					STABILITY_ECDSA_ROUNDS(17) <= '1';
+					DSA_MULTV_M <= DATA_Curve_Prime;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(17) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(15) = '1') then
 					--Compute JPZ_INV_CUBED (over Curve) between uG and vQ
 					--CAPTURE OUTPUTS
 					if ((DSA_MULTV_STABLE) = '1') then
 						DSA_JQZ_INV_CUBED <= DSA_MULTV_P;
 						STABILITY_ECDSA_ROUNDS(16) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(14) = '1') then
 					--Compute JPZ_INV_CUBED (over Curve) between uG and vQ
 					--SETUP INPUTS
 					DSA_MULTV_A <= DSA_JQZ_INV;
 					DSA_MULTV_B <= DSA_JQZ_INV_SQUARED;
-					STABILITY_ECDSA_ROUNDS(15) <= '1';
+					DSA_MULTV_M <= DATA_Curve_Prime;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(15) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(13) = '1') then
 					--Compute JPZ_INV_SQUARED (over Curve) between uG and vQ
 					--CAPTURE OUTPUTS
 					if ((DSA_MULTU_STABLE) = '1') then
 						DSA_JQZ_INV_SQUARED <= DSA_MULTU_P;
 						STABILITY_ECDSA_ROUNDS(14) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(12) = '1') then
 					--Compute JPZ_INV_SQUARED (over Curve) between uG and vQ
 					--SETUP INPUTS
 					DSA_MULTU_A <= DSA_JQZ_INV;
 					DSA_MULTU_B <= DSA_JQZ_INV;
-					STABILITY_ECDSA_ROUNDS(13) <= '1';
+					DSA_MULTU_M <= DATA_Curve_Prime;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(13) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(11) = '1') then
 					--Compute JPZ_INV (over Curve) between uG and vQ
 					--CAPTURE OUTPUTS
-					if (INV_INVERSE_STABLE = '1') then
+					if (INV_INVERSE_STABLE = '0') then
 						DSA_JQZ_INV <= INV_INVERSE;
 						STABILITY_ECDSA_ROUNDS(12) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(10) = '1') then
 					--Compute JPZ_INV (over Curve) between uG and vQ
 					--SETUP INPUTS
 					INV_ELEMENT <= DSA_JQZ;
-					STABILITY_ECDSA_ROUNDS(11) <= '1';
+					INV_MODULUS <= DATA_Curve_Prime;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(11) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(9) = '1') then
 					--Compute JPA (over Curve) between uG and vQ
 					--CAPTURE OUTPUTS
@@ -900,12 +1039,21 @@ begin
 						DSA_JQY <= DSA_JPA_JQY;
 						DSA_JQZ <= DSA_JPA_JQZ;
 						STABILITY_ECDSA_ROUNDS(10) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(8) = '1') then
 					--Compute JPA (over Curve) between uG and vQ
 					--SETUP INPUTS
 					--Inputs are fixed to the DSA_PM registers, hold one round of the STABILITY_ECDSA to let JPA stabilise
-					STABILITY_ECDSA_ROUNDS(9) <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(9) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(7) = '1') then
 					--Compute PM (over Curve) of vQ (Q, the persons public key)
 					--CAPTURE OUTPUTS
@@ -913,16 +1061,25 @@ begin
 						DSA_PM_ByQ_X <= PM_AQX;
 						DSA_PM_ByQ_Y <= PM_AQY;
 						STABILITY_ECDSA_ROUNDS(8) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(6) = '1') then
 					--Compute PM (over Curve) of vQ (Q, the persons public key)
 					--SETUP INPUTS
-					PM_KEY <= DSA_V;
+					PM_KEY <= DSA_V; --V = ((S Inverse) * R)
 					PM_APX <= DATA_Key_Public_Other_X;
 					PM_APY <= DATA_Key_Public_Other_Y;
 					PM_Modulus <= DATA_Curve_Prime;
 					PM_ECC_A <= DATA_Curve_A;
-					STABILITY_ECDSA_ROUNDS(7) <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(7) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(5) = '1') then
 					--Compute PM (over Curve) of uG
 					--CAPTURE OUTPUTS
@@ -930,48 +1087,79 @@ begin
 						DSA_PM_ByG_X <= PM_AQX;
 						DSA_PM_ByG_Y <= PM_AQY;
 						STABILITY_ECDSA_ROUNDS(6) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(4) = '1') then
 					--Compute PM (over Curve) of uG
 					--SETUP INPUTS
-					PM_KEY <= DSA_U;
+					PM_KEY <= DSA_U; --U = ((S Inverse) * Hash)
 					PM_APX <= DATA_Curve_GX;
 					PM_APY <= DATA_Curve_GY;
 					PM_Modulus <= DATA_Curve_Prime;
 					PM_ECC_A <= DATA_Curve_A;
-					STABILITY_ECDSA_ROUNDS(5) <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(5) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(3) = '1') then
 					--Compute 2 MULTS (over Curve_N) of u(Signature_S_Inv * E) and v(Signature_S_Inv * Signature_R)
 					--CAPTURE OUTPUTS
 					if ((DSA_MULTV_STABLE and DSA_MULTU_STABLE) = '1') then
-						DSA_U <= DSA_MULTU_P;
-						DSA_V <= DSA_MULTV_P;
+						DSA_U <= DSA_MULTU_P; --U = ((S Inverse) * Hash)
+						DSA_V <= DSA_MULTV_P; --V = ((S Inverse) * R)
 						STABILITY_ECDSA_ROUNDS(4) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(2) = '1') then
 					--Compute 2 MULTS (over Curve_N) of u(Signature_S_Inv * E) and v(Signature_S_Inv * Signature_R)
 					--SETUP INPUTS
 					DSA_MULTV_A <= DSA_INVERSE;
 					DSA_MULTV_B <= DATA_Signature_R;
+					DSA_MULTV_M <= DATA_Curve_N;
 					DSA_MULTU_A <= DSA_INVERSE;
 					DSA_MULTU_B <= DATA_HASH_Total;
-					STABILITY_ECDSA_ROUNDS(3) <= '1';
+					DSA_MULTU_M <= DATA_Curve_N;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(3) <= '1';
+					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(1) = '1') then
 					--Compute Inverse (over Curve_N) of Signature_S
 					--CAPTURE OUTPUTS
-					if (INV_INVERSE_STABLE = '1') then
+					if (INV_INVERSE_STABLE = '0') then
 						DSA_INVERSE <= INV_INVERSE;
 						STABILITY_ECDSA_ROUNDS(2) <= '1';
+						CLK_QUAD <= "00";
 					end if;
 				elsif (STABILITY_ECDSA_ROUNDS(0) = '1') then
 					--Compute Inverse (over Curve_N) of Signature_S
 					--SETUP INPUTS
 					INV_ELEMENT <= DATA_Signature_S;
-					STABILITY_ECDSA_ROUNDS(1) <= '1';
+					INV_MODULUS <= DATA_Curve_N;
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						STABILITY_ECDSA_ROUNDS(1) <= '1';
+					end if;
 				else
 					--Take E from DATA_HASH_Total
 					--Take Signature_R from DATA_Signature_R
 					--Take Signature_S from DATA_Signature_S
+					CLK_QUAD <= "00";
 					STABILITY_ECDSA_ROUNDS(0) <= '1';
 				end if;
 			end if;

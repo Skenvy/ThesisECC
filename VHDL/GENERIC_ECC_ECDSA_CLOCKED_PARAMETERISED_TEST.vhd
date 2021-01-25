@@ -102,8 +102,8 @@ ARCHITECTURE behavior OF GENERIC_ECC_ECDSA_CLOCKED_PARAMETERISED_TEST IS
 	--Input Read From
 	signal Key_Public_Other_X : std_logic_vector((VecLen-1) downto 0) := "00000";--0
 	signal Key_Public_Other_Y : std_logic_vector((VecLen-1) downto 0) := "01011";--11
-	signal Key_Private : std_logic_vector((VecLen-1) downto 0) := "01101";--13
-	signal HASH_TOTAL : std_logic_vector((VecLen-1) downto 0) := "10101";--21
+	signal Key_Private : std_logic_vector((VecLen-1) downto 0) := "00111";--13
+	signal HASH_TOTAL : std_logic_vector((VecLen-1) downto 0) := "01110";
 	
 	
 	--Output Write To
@@ -115,7 +115,7 @@ ARCHITECTURE behavior OF GENERIC_ECC_ECDSA_CLOCKED_PARAMETERISED_TEST IS
 	--Bidir IO RW
 	signal Signature_R : std_logic_vector((VecLen-1) downto 0) := "00000";
 	signal Signature_S : std_logic_vector((VecLen-1) downto 0) := "00000";
-	signal Signature_K : std_logic_vector((VecLen-1) downto 0) := "00000";
+	signal Signature_K : std_logic_vector((VecLen-1) downto 0) := "10110";
 	
 BEGIN
  
@@ -196,7 +196,7 @@ BEGIN
 		--Compute the user's public key
 		wait for CLK_period*(VecLen*3);
 		Command <= "010";
-		wait for CLK_period*(VecLen*390);
+		wait for CLK_period*(VecLen*250);
 		--Read out the user's public key
 		wait for CLK_period*(VecLen*3);
 		Command <= "000";
@@ -207,9 +207,8 @@ BEGIN
 		Key_Public_User_Y <= DATABUS((VecLen-1) downto 0);
 		--Compute the shared key
 		wait for CLK_period*(VecLen*3);
-		wait for CLK_period*(VecLen*3);
 		Command <= "011";
-		wait for CLK_period*(VecLen*390);
+		wait for CLK_period*(VecLen*250);
 		--Read out the shared key
 		wait for CLK_period*(VecLen*3);
 		Command <= "000";
@@ -218,7 +217,57 @@ BEGIN
 		wait for CLK_period*(VecLen*2);
 		Key_Shared_X <= DATABUS(((2*VecLen)-1) downto VecLen);
 		Key_Shared_Y <= DATABUS((VecLen-1) downto 0);
-		
+		--Write the HASH
+		wait for CLK_period*(VecLen*3);
+		LacthToReadFrom <= "1010";
+		wait for CLK_period*(VecLen*3);
+		DATABUS <= ZeroVector & HASH_TOTAL;
+		RW <= '1';
+		wait for CLK_period*(VecLen*3);
+		RW <= '0';
+		DATABUS <= (others => 'Z');
+		--Write the Signature_K
+		wait for CLK_period*(VecLen*3);
+		LacthToReadFrom <= "1001";
+		wait for CLK_period*(VecLen*3);
+		DATABUS <= ZeroVector & Signature_K;
+		RW <= '1';
+		wait for CLK_period*(VecLen*3);
+		RW <= '0';
+		DATABUS <= (others => 'Z');
+		--Compute the signature for the HASH, Private Key, and Signature_K
+		wait for CLK_period*(VecLen*3);
+		Command <= "110";
+		wait for CLK_period*(VecLen*600);
+		--Read out the shared key
+		wait for CLK_period*(VecLen*3);
+		Command <= "000";
+		LacthToReadFrom <= "1000";
+		RW <= '0';
+		wait for CLK_period*(VecLen*2);
+		Signature_R <= DATABUS(((2*VecLen)-1) downto VecLen);
+		Signature_S <= DATABUS((VecLen-1) downto 0);
+		--Read out the user's public key to the "other's public key"
+		wait for CLK_period*(VecLen*3);
+		Command <= "000";
+		LacthToReadFrom <= "0101";
+		RW <= '0';
+		wait for CLK_period*(VecLen*2);
+		Key_Public_Other_X <= DATABUS(((2*VecLen)-1) downto VecLen);
+		Key_Public_Other_Y <= DATABUS((VecLen-1) downto 0);
+		--Write the Key_Public_Other
+		wait for CLK_period*(VecLen*3);
+		LacthToReadFrom <= "0110";
+		wait for CLK_period*(VecLen*3);
+		DATABUS <= Key_Public_Other_X & Key_Public_Other_Y;
+		RW <= '1';
+		wait for CLK_period*(VecLen*3);
+		RW <= '0';
+		DATABUS <= (others => 'Z');
+		--Verify the signature for the "other's public key" (now the user's public key), the HASH, and the signature pair (r,s)
+		wait for CLK_period*(VecLen*3);
+		Command <= "111";
+		wait for CLK_period*(VecLen*800);
 		
       wait;
    end process;

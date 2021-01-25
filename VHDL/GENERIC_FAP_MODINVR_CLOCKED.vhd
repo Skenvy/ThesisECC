@@ -91,6 +91,7 @@ signal InternalInverse : STD_LOGIC_VECTOR((N-1) downto 0);
 signal PreviousElement : STD_LOGIC_VECTOR((N-1) downto 0);
 signal PreviousModulus : STD_LOGIC_VECTOR((N-1) downto 0);
 signal StableElement : STD_LOGIC;
+signal CHANGELOCK_Element : STD_LOGIC_VECTOR(1 downto 0) := "11";
 signal StableModulus : STD_LOGIC;
 signal UnitaryU : STD_LOGIC;
 signal UnitaryV : STD_LOGIC;
@@ -164,10 +165,10 @@ process(CLK)
 begin
 	if	(rising_edge(CLK)) then
 		if ((StableElement and StableModulus) = '1')  then
-			if (UnitaryU = '1') then --If end condition met and inputs are stable, put output
+			if ((UnitaryU and CHANGELOCK_Element(1) and CHANGELOCK_Element(0)) = '1') then --If end condition met and inputs are stable, put output
 				InternalInverse <= XoutModded;
 				StableInverse <= '1';
-			elsif (UnitaryV = '1') then --If end condition met and inputs are stable, put output
+			elsif ((UnitaryV and CHANGELOCK_Element(1) and CHANGELOCK_Element(0)) = '1') then --If end condition met and inputs are stable, put output
 				InternalInverse <= YoutModded;
 				StableInverse <= '1';
 			else
@@ -175,6 +176,13 @@ begin
 				V <= Vout;
 				X <= Xout;
 				Y <= Yout;
+				if (CHANGELOCK_Element = "00") then
+					CHANGELOCK_Element <= "01";
+				elsif (CHANGELOCK_Element = "01") then
+					CHANGELOCK_Element <= "10";
+				elsif (CHANGELOCK_Element = "10") then
+					CHANGELOCK_Element <= "11";
+				end if;
 			end if;
 		else --Else, reset the signals and begin updates again.
 			PreviousElement <= Element;
@@ -184,6 +192,7 @@ begin
 			X <= UnitVector;
 			Y <= ZeroVector;
 			StableInverse <= '0';
+			CHANGELOCK_Element <= "00";
 		end if;	
 	end if;
 end process;
