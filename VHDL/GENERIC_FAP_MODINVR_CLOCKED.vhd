@@ -170,11 +170,12 @@ begin
 			elsif (UnitaryV = '1') then --If end condition met and inputs are stable, put output
 				InternalInverse <= YoutModded;
 				StableInverse <= '1';
+			else
+				U <= Uout;
+				V <= Vout;
+				X <= Xout;
+				Y <= Yout;
 			end if;
-			U <= Uout;
-			V <= Vout;
-			X <= Xout;
-			Y <= Yout;
 		else --Else, reset the signals and begin updates again.
 			PreviousElement <= Element;
 			PreviousModulus <= Modulus;

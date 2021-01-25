@@ -92,10 +92,13 @@ component GENERIC_FAP_RELATIONAL
            G : out  STD_LOGIC);
 end component;
 
+signal StableOutputInner : STD_LOGIC;
 signal Stability_JPM : STD_LOGIC;
 signal JQX : STD_LOGIC_VECTOR((N-1) downto 0);
 signal JQY : STD_LOGIC_VECTOR((N-1) downto 0);
 signal JQZ : STD_LOGIC_VECTOR((N-1) downto 0);
+signal AQXInner : STD_LOGIC_VECTOR((N-1) downto 0);
+signal AQYInner : STD_LOGIC_VECTOR((N-1) downto 0);
 signal Inverse : STD_LOGIC_VECTOR((N-1) downto 0);
 signal InverseSquared : STD_LOGIC_VECTOR((N-1) downto 0);
 signal InverseCubed : STD_LOGIC_VECTOR((N-1) downto 0);
@@ -104,8 +107,23 @@ signal Stability_Squared : STD_LOGIC;
 signal Stability_Cubed : STD_LOGIC;
 signal Stability_AQX : STD_LOGIC;
 signal Stability_AQY : STD_LOGIC;
+signal Stability_JPM_Held3 : STD_LOGIC_VECTOR(2 downto 0);
+signal Stability_Inverse_Held3 : STD_LOGIC_VECTOR(2 downto 0);
+signal Infinity_JQZ : STD_LOGIC;
+signal Infinity_APX : STD_LOGIC;
+signal Infinity_APY : STD_LOGIC;
+signal Infinity_Input : STD_LOGIC;
 
 begin
+
+StableOutput <= StableOutputInner;
+Infinity_Input <= (Infinity_APX and Infinity_APY);
+
+AQGen : For K in 0 to (N-1) generate
+begin
+	AQX(K) <= (AQXInner(K) and (StableOutputInner and (not Infinity_JQZ) and (not Infinity_Input)));
+	AQY(K) <= (AQYInner(K) and (StableOutputInner and (not Infinity_JQZ) and (not Infinity_Input)));
+end generate AQGen;
 
 JPM : GENERIC_ECC_JACOBIAN_POINT_MULTIPLY_CLOCKED
 	 Generic Map (NGen => N,
@@ -133,6 +151,30 @@ MODINV : GENERIC_FAP_MODINVR_CLOCKED
 				  Inverse => Inverse,
 				  Modulus => Modulus,
 				  CLK => CLK);
+				  
+JQZISZERO : GENERIC_FAP_RELATIONAL
+	 Generic Map (N => N,
+				 VType => 0) --0 for just equality, 1 for Greater Than test : Default 1
+    Port Map ( A => JQZ,
+           B => ZeroVector,
+           E => Infinity_JQZ,
+           G => open);
+			  
+APXISZERO : GENERIC_FAP_RELATIONAL
+	 Generic Map (N => N,
+				 VType => 0) --0 for just equality, 1 for Greater Than test : Default 1
+    Port Map ( A => APX,
+           B => ZeroVector,
+           E => Infinity_APX,
+           G => open);
+			  
+APYISZERO : GENERIC_FAP_RELATIONAL
+	 Generic Map (N => N,
+				 VType => 0) --0 for just equality, 1 for Greater Than test : Default 1
+    Port Map ( A => APY,
+           B => ZeroVector,
+           E => Infinity_APY,
+           G => open);
 
 INVISZERO : GENERIC_FAP_RELATIONAL
 	 Generic Map (N => N,
@@ -177,7 +219,7 @@ MULT_AX : GENERIC_FAP_MODMULT_CLOCKEDCOMBS_TOOMCOOK
     Port Map ( MultiplicandA => JQX,
 					MultiplicandB => InverseSquared,
 					Modulus => Modulus,
-					Product => AQX,
+					Product => AQXInner,
 					CLK => CLK,
 					StableOutput => Stability_AQX);
 
@@ -190,11 +232,38 @@ MULT_AY : GENERIC_FAP_MODMULT_CLOCKEDCOMBS_TOOMCOOK
     Port Map ( MultiplicandA => JQY,
 					MultiplicandB => InverseCubed,
 					Modulus => Modulus,
-					Product => AQY,
+					Product => AQYInner,
 					CLK => CLK,
 					StableOutput => Stability_AQY);
 
-StableOutput <= ((Stability_JPM and (not Stability_Inverse) and Stability_Squared) and (Stability_Cubed and Stability_AQX and Stability_AQY));
+process(CLK)
+begin
+	if	(rising_edge(CLK)) then
+		if (Stability_JPM = '1') then
+			if (Stability_JPM_Held3(1) = '1') then
+				Stability_JPM_Held3(2) <= '1';
+			elsif (Stability_JPM_Held3(0) = '1') then
+				Stability_JPM_Held3(1) <= '1';
+			else
+				Stability_JPM_Held3(0) <= '1';
+			end if;
+		else
+			Stability_JPM_Held3 <= "000";
+		end if;
+		if (((not Stability_Inverse) or (Infinity_JQZ and Stability_JPM_Held3(2))) = '1') then
+			if (Stability_Inverse_Held3(1) = '1') then
+				Stability_Inverse_Held3(2) <= '1';
+			elsif (Stability_Inverse_Held3(0) = '1') then
+				Stability_Inverse_Held3(1) <= '1';
+			else
+				Stability_Inverse_Held3(0) <= '1';
+			end if;
+		else
+			Stability_Inverse_Held3 <= "000";
+		end if;
+		StableOutputInner <= ((Stability_JPM_Held3(2) and Stability_Inverse_Held3(2) and Stability_Squared) and (Stability_Cubed and Stability_AQX and Stability_AQY));
+	end if;
+end process;
 
 end Behavioral;
 

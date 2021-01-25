@@ -377,9 +377,9 @@ BZ_STABLE : GENERIC_FAP_RELATIONAL
 
 OutGen : for K in 0 to (NGen-1) generate
 begin
-	CX(K) <= ((XBUFF(K) and (STAGE_STABILITIES(9) and (not AZ_Zero) and (not BZ_Zero))) or (BX(K) and AZ_Zero) or (AX(K) and BZ_Zero));
-	CY(K) <= ((YBUFF(K) and (STAGE_STABILITIES(9) and (not AZ_Zero) and (not BZ_Zero))) or (BY(K) and AZ_Zero) or (AY(K) and BZ_Zero));
-	CZ(K) <= ((ZBUFF(K) and (STAGE_STABILITIES(9) and (not AZ_Zero) and (not BZ_Zero))) or (BZ(K) and AZ_Zero) or (AZ(K) and BZ_Zero));
+	CX(K) <= (((XBUFF(K) and ((not AZ_Zero) and (not BZ_Zero))) or (BX(K) and AZ_Zero) or (AX(K) and BZ_Zero)) and STAGE_STABILITIES(9));
+	CY(K) <= (((YBUFF(K) and ((not AZ_Zero) and (not BZ_Zero))) or (BY(K) and AZ_Zero) or (AY(K) and BZ_Zero)) and STAGE_STABILITIES(9));
+	CZ(K) <= (((ZBUFF(K) and ((not AZ_Zero) and (not BZ_Zero))) or (BZ(K) and AZ_Zero) or (AZ(K) and BZ_Zero)) and STAGE_STABILITIES(9));
 end generate OutGen;
 
 StableOutput <= STAGE_STABILITIES(9);
@@ -387,9 +387,7 @@ StableOutput <= STAGE_STABILITIES(9);
 process(CLK)
 begin
 	if(rising_edge(CLK)) then
-		if ((AZ_Zero or BZ_Zero) = '1') then
-			STAGE_STABILITIES <= (others => '1');
-		elsif((AX_Stability and AY_Stability and AZ_Stability and BX_Stability and BY_Stability and BZ_Stability) = '1') then
+		if((AX_Stability and AY_Stability and AZ_Stability and BX_Stability and BY_Stability and BZ_Stability) = '1') then
 			--Now when the inputs are stable.
 			if(((not CLK_Stability(1)) and (not CLK_Stability(0))) = '1') then
 				CLK_Stability(0) <= '1';

@@ -104,6 +104,9 @@ signal MemDoublingZ : STD_LOGIC_VECTOR ((NGen-1) downto 0);
 signal MemAddingX : STD_LOGIC_VECTOR ((NGen-1) downto 0);
 signal MemAddingY : STD_LOGIC_VECTOR ((NGen-1) downto 0);
 signal MemAddingZ : STD_LOGIC_VECTOR ((NGen-1) downto 0);
+signal MemNonceX : STD_LOGIC_VECTOR ((NGen-1) downto 0);
+signal MemNonceY : STD_LOGIC_VECTOR ((NGen-1) downto 0);
+signal MemNonceZ : STD_LOGIC_VECTOR ((NGen-1) downto 0);
 --Temporal Adder Inputs and Outputs for the port map
 signal ADDRAX : STD_LOGIC_VECTOR ((NGen-1) downto 0);
 signal ADDRAY : STD_LOGIC_VECTOR ((NGen-1) downto 0);
@@ -135,6 +138,7 @@ signal PreviousKEY : STD_LOGIC_VECTOR((NGen-1) downto 0);
 --Hold the index and used to check that the entirety of K has been realised
 signal Jindex : STD_LOGIC_VECTOR((NGen-1) downto 0);
 signal JComplete : STD_LOGIC_VECTOR((NGen-1) downto 0);
+signal Jnext : STD_LOGIC_VECTOR((NGen-1) downto 0);
 signal CLKDBL : STD_LOGIC; --Used to offset the input to output timing for inputs to the addr and doub cells, to place inputs on them in one clock cycle and then continuously check the output stability in every following clock cycles
 --Stability
 signal StableADDR : STD_LOGIC;
@@ -145,8 +149,9 @@ signal JPZ_Stable : STD_LOGIC;
 signal KEY_Stable : STD_LOGIC;
 signal J_Finished : STD_LOGIC;
 signal Adding_Round : STD_LOGIC;
+signal Adding_Round_Next : STD_LOGIC;
 signal JK : STD_LOGIC_VECTOR((NGen-1) downto 0);
-
+signal JKnext : STD_LOGIC_VECTOR((NGen-1) downto 0);
 
 begin
 
@@ -186,13 +191,13 @@ KSTABLE : GENERIC_FAP_RELATIONAL
            E => KEY_Stable,
            G => open);
 			  
-TERMEQUI : GENERIC_FAP_RELATIONAL
-	 Generic Map (N => NGen,
-				 VType => 0) --0 for just equality, 1 for Greater Than test : Default 1
-    Port Map ( A => KEY,
-           B => JComplete,
-           E => J_Finished,
-           G => open);
+--TERMEQUI : GENERIC_FAP_RELATIONAL
+--	 Generic Map (N => NGen,
+--				 VType => 0) --0 for just equality, 1 for Greater Than test : Default 1
+--    Port Map ( A => KEY,
+--           B => JComplete,
+--           E => J_Finished,
+--           G => open);
 			  
 ADDRROUND : GENERIC_FAP_RELATIONAL
 	 Generic Map (N => NGen,
@@ -200,6 +205,14 @@ ADDRROUND : GENERIC_FAP_RELATIONAL
     Port Map ( A => JK,
            B => ZeroVector,
            E => Adding_Round,
+           G => open);
+			  
+ADDRROUNDNEXT : GENERIC_FAP_RELATIONAL
+	 Generic Map (N => NGen,
+				 VType => 0) --0 for just equality, 1 for Greater Than test : Default 1
+    Port Map ( A => JKnext,
+           B => ZeroVector,
+           E => Adding_Round_Next,
            G => open);
 
 -------------------------
@@ -212,14 +225,14 @@ begin
 	JQX(K) <= (InternalJQX(K) and StableOutputInner);
 	JQY(K) <= (InternalJQY(K) and StableOutputInner);
 	JQZ(K) <= (InternalJQZ(K) and StableOutputInner);
+	ADDRAX(K) <= ((MemAddingX(K) and ((not Adding_Round) or (not Adding_Round_Next))) or (MemNonceX(K) and (Adding_Round and Adding_Round_Next)));
+	ADDRAY(K) <= ((MemAddingY(K) and ((not Adding_Round) or (not Adding_Round_Next))) or (MemNonceY(K) and (Adding_Round and Adding_Round_Next)));
+	ADDRAZ(K) <= ((MemAddingZ(K) and ((not Adding_Round) or (not Adding_Round_Next))) or (MemNonceZ(K) and (Adding_Round and Adding_Round_Next)));
 end generate OutGen;
 
 StableOutput <= StableOutputInner;
 
 --Connecting the data bus lines of the ports.
-ADDRAX <= MemAddingX;
-ADDRAY <= MemAddingY;
-ADDRAZ <= MemAddingZ;
 ADDRBX <= MemDoublingX;
 ADDRBY <= MemDoublingY;
 ADDRBZ <= MemDoublingZ;
@@ -227,6 +240,7 @@ DOUBAX <= MemDoublingX;
 DOUBAY <= MemDoublingY;
 DOUBAZ <= MemDoublingZ;
 JK <= (Jindex and KEY);
+JKnext <= (Jnext and KEY);
 
 process(CLK)
 begin
@@ -239,16 +253,25 @@ begin
 				StableOutputInner <= '1';
 			elsif (CLKDBL = '0') then
 				CLKDBL <= '1';
-			elsif ((StableADDR and StableDOUB) = '1') then --Else, if the inputs are stable, do the update.
+			elsif ((StableADDR and StableDOUB) = '1') then --Else, if the cells are stable, do the update.
 				if (Adding_Round = '0') then --if adding bit, then do the adding (zero from 'not' equal to the ZSeroVector)
 					MemAddingX <= ADDRCX;
 					MemAddingY <= ADDRCY;
 					MemAddingZ <= ADDRCZ;
-				end if; --Do the doubling unambiguously.
+				else
+					MemNonceX <= ADDRCX;
+					MemNonceY <= ADDRCY;
+					MemNonceZ <= ADDRCZ;
+				end if; 
+				--Do the doubling unambiguously.
 				MemDoublingX <= DOUBCX;
 				MemDoublingY <= DOUBCY;
 				MemDoublingZ <= DOUBCZ;
-				Jindex <= Jindex((VecLen - 2) downto 0) & "0";
+				if (Jindex(NGen-1) = '1') then
+					J_Finished <= '1';
+				end if;
+				Jindex <= Jindex((NGen-2) downto 0) & "0";
+				Jnext <= Jnext((NGen-2) downto 0) & "0";
 				JComplete <= (JComplete or JK);
 				CLKDBL <= '0';
 			end if;
@@ -266,9 +289,14 @@ begin
 			MemAddingX <= UnitVector;
 			MemAddingY <= UnitVector;
 			MemAddingZ <= ZeroVector;
+			MemNonceX <= UnitVector;
+			MemNonceY <= UnitVector;
+			MemNonceZ <= ZeroVector;
 			Jindex <= UnitVector;
 			JComplete <= ZeroVector;
+			Jnext <= UnitVector((NGen-2) downto 0) & "0";
 			CLKDBL <= '0';
+			J_Finished <= '0';
 		end if;	
 	end if;
 end process;

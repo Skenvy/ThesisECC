@@ -65,7 +65,7 @@ ARCHITECTURE behavior OF GENERIC_ECC_AFFINE_POINT_MULTIPLY_CLOCKED_TEST IS
    signal StableOutput : std_logic;
 
    -- Clock period definitions
-   constant CLK_period : time := 30 ns;
+   constant CLK_period : time := 60 ns;
  
 BEGIN
  
@@ -98,7 +98,7 @@ BEGIN
       Modulus <= "10001";
 		ECC_A <= "00010";
       -- hold reset state for 100 ns.
-      wait for 100 ns; --Expect (7,6)
+      wait for 100 ns; 						 --Expect (7,6)
 		KEY <= "00001";
 		APX <= "00111";
 		APY <= "00110";
@@ -118,6 +118,57 @@ BEGIN
 		KEY <= "01111";
 		APX <= "00111";
 		APY <= "00110";
+		--Scan (7,6)
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "00000";
+		APX <= "00111";
+		APY <= "00110";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "00001";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "00010";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "00011";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "00100";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "00101";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "00110";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "00111";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "01000";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "01001";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "01010";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "01011";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "01100";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "01101";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "01110";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "01111";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "10000";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "10001";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "10010";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "10011";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "10100";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "10101";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "10110";
+		wait for CLK_period*(VecLen*500); --Expect (1,1,0)
+		KEY <= "10111";
       wait;
    end process;
 
