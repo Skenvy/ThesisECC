@@ -53,6 +53,7 @@ webtalk_impact.xml
 xaw2verilog.log
 
 # project-wide generated files
+*.xise
 *.gise
 par_usage_statistics.html
 usage_statistics_webtalk.html
