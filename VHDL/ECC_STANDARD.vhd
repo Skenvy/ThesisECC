@@ -9,6 +9,7 @@
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
+use work.VECTOR_STANDARD.ALL;
 
 package ECC_STANDARD is
 
@@ -26,18 +27,16 @@ constant B_M17 : STD_LOGIC_VECTOR (4 downto 0) := "00010";
 
 
 ----current standard being used;
---constant FieldLength : natural := 5;
---constant Prime :STD_LOGIC_VECTOR ((FieldLength - 1) downto 0) := Prime_M17;
---constant Prime_2Compliment :STD_LOGIC_VECTOR ((FieldLength - 1) downto 0) := Prime_M17_2Compliment;
---constant ECC_A :STD_LOGIC_VECTOR ((FieldLength - 1) downto 0) := A_M17;
---constant ECC_B :STD_LOGIC_VECTOR ((FieldLength - 1) downto 0) := B_M17;
+--constant Prime :STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := Prime_M17;
+--constant Prime_2Compliment :STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := Prime_M17_2Compliment;
+--constant ECC_A :STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := A_M17;
+--constant ECC_B :STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := B_M17;
 
 --current standard being used;
-constant FieldLength : natural := 256;
-constant Prime :STD_LOGIC_VECTOR ((FieldLength - 1) downto 0) := Prime_NISTsecp256r1;
-constant Prime_2Compliment :STD_LOGIC_VECTOR ((FieldLength - 1) downto 0) := Prime_NISTsecp256r1_2Compliment;
-constant ECC_A :STD_LOGIC_VECTOR ((FieldLength - 1) downto 0) := A_NISTsecp256r1;
-constant ECC_B :STD_LOGIC_VECTOR ((FieldLength - 1) downto 0) := B_NISTsecp256r1;
+constant Prime :STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := Prime_NISTsecp256r1;
+constant Prime_2Compliment :STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := Prime_NISTsecp256r1_2Compliment;
+constant ECC_A :STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := A_NISTsecp256r1;
+constant ECC_B :STD_LOGIC_VECTOR ((VecLen - 1) downto 0) := B_NISTsecp256r1;
 
 
 end ECC_STANDARD;
