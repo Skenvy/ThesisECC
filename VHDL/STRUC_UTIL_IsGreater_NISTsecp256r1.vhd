@@ -19,25 +19,15 @@
 ----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-
+use work.ECC_STANDARD.ALL;
 entity STRUC_UTIL_IsGreater_NISTsecp256r1 is
     Port ( InVal : in  STD_LOGIC_VECTOR (256 downto 0);
-           IsGreater : out  STD_LOGIC); --1 iff InVal > Prime, else 0
+           IsGreater : out  STD_LOGIC); 
+			  --1 iff InVal > Prime, else 0
 end STRUC_UTIL_IsGreater_NISTsecp256r1;
-
---Stub Entity: Currently implemented behaviourally, left to make structural.
 architecture Behavioral of STRUC_UTIL_IsGreater_NISTsecp256r1 is
-
---------------------------------
------CONSTANTS DECLARATIONS-----
---------------------------------
-
---NIST-secp256r1-Prime
-constant Prime : STD_LOGIC_VECTOR (256 downto 0) := "0" & X"FFFF_FFFF_0000_0001_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF";
-
+constant Prime : STD_LOGIC_VECTOR (256 downto 0) := "0" & SECp256r1(0);
 begin
-
 IsGreater <= '1' when (InVal > Prime) else '0';
-
 end Behavioral;
 

@@ -11,26 +11,14 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 use work.VECTOR_STANDARD.ALL;
 
+--A package containing declarations of constant parameter sets
+--Of Elliptic Curve Domain Parameters.
 package ECC_STANDARD is
 
---Static Naming Left in Place for legacy: NIST-secp256r1
-constant Prime_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"FFFF_FFFF_0000_0001_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF";
-constant Prime_NISTsecp256r1_2Compliment : STD_LOGIC_VECTOR (255 downto 0) := X"0000_0000_FFFF_FFFE_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_0000_0000_0000_0000_0000_0001";
-constant A_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"FFFF_FFFF_0000_0001_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFC";
-constant B_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"5AC6_35D8_AA3A_93E7_B3EB_BD55_7698_86BC_651D_06B0_CC53_B0F6_3BCE_3C3E_27D2_604B";
-constant GX_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"6B17_D1F2_E12C_4247_F8BC_E6E5_63A4_40F2_7703_7D81_2DEB_33A0_F4A1_3945_D898_C296";
-constant GY_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"4FE3_42E2_FE1A_7F9B_8EE7_EB4A_7C0F_9E16_2BCE_3357_6B31_5ECE_CBB6_4068_37BF_51F5";
-constant N_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"FFFFFFFF_00000000_FFFFFFFF_FFFFFFFF_BCE6FAAD_A7179E84_F3B9CAC2_FC632551";
+----------------------------------------------------
+-----------Declare types of generic size!-----------
+----------------------------------------------------
 
---Static Naming Left in Place for legacy: Module over '17'
-constant Prime_M17 : STD_LOGIC_VECTOR (4 downto 0) := "10001";
-constant Prime_M17_2Compliment : STD_LOGIC_VECTOR (4 downto 0) := "01111";
-constant A_M17 : STD_LOGIC_VECTOR (4 downto 0) := "00010";
-constant B_M17 : STD_LOGIC_VECTOR (4 downto 0) := "00010";
-constant GX_M17 : STD_LOGIC_VECTOR (4 downto 0) := "00111";
-constant GY_M17 : STD_LOGIC_VECTOR (4 downto 0) := "00110";
-
---Declare types of generic size!
 type ECC_Parameters_521 is array (0 to 5) of STD_LOGIC_VECTOR(520 downto 0);
 type ECC_Parameters_384 is array (0 to 5) of STD_LOGIC_VECTOR(383 downto 0);
 type ECC_Parameters_256 is array (0 to 5) of STD_LOGIC_VECTOR(255 downto 0);
@@ -41,7 +29,10 @@ type ECC_Parameters_128 is array (0 to 5) of STD_LOGIC_VECTOR(127 downto 0);
 type ECC_Parameters_112 is array (0 to 5) of STD_LOGIC_VECTOR(111 downto 0);
 type ECC_Parameters_5 is array (0 to 5) of STD_LOGIC_VECTOR(4 downto 0);
 
---Naming model
+----------------------------------
+-----------Naming model-----------
+----------------------------------
+
 ----Curve_Name
 --constant Curve_Name : ECC_Parameters_BitLength := (
 --X"Hex String", --Prime
@@ -50,6 +41,10 @@ type ECC_Parameters_5 is array (0 to 5) of STD_LOGIC_VECTOR(4 downto 0);
 --X"Hex String", --GX
 --X"Hex String", --GY
 --X"Hex String");--N
+
+-------------------------------------
+-----------List of Curves!-----------
+-------------------------------------
 
 --SECp521r1
 constant SECp521r1 : ECC_Parameters_521 := (
@@ -165,6 +160,25 @@ constant M17 : ECC_Parameters_5 := (
 "00110", --GY
 "10011");--N
 
+-----------------------------------------------------------------------------
+-----------Legacy Curves, left here for use by older library files-----------
+-----------------------------------------------------------------------------
+
+--SECp256r1 (non-typed)
+constant Prime_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"FFFF_FFFF_0000_0001_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF";
+constant Prime_NISTsecp256r1_2Compliment : STD_LOGIC_VECTOR (255 downto 0) := X"0000_0000_FFFF_FFFE_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_0000_0000_0000_0000_0000_0001";
+constant A_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"FFFF_FFFF_0000_0001_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFC";
+constant B_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"5AC6_35D8_AA3A_93E7_B3EB_BD55_7698_86BC_651D_06B0_CC53_B0F6_3BCE_3C3E_27D2_604B";
+constant GX_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"6B17_D1F2_E12C_4247_F8BC_E6E5_63A4_40F2_7703_7D81_2DEB_33A0_F4A1_3945_D898_C296";
+constant GY_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"4FE3_42E2_FE1A_7F9B_8EE7_EB4A_7C0F_9E16_2BCE_3357_6B31_5ECE_CBB6_4068_37BF_51F5";
+constant N_NISTsecp256r1 : STD_LOGIC_VECTOR (255 downto 0) := X"FFFFFFFF_00000000_FFFFFFFF_FFFFFFFF_BCE6FAAD_A7179E84_F3B9CAC2_FC632551";
+--M17 (non-typed)
+constant Prime_M17 : STD_LOGIC_VECTOR (4 downto 0) := "10001";
+constant Prime_M17_2Compliment : STD_LOGIC_VECTOR (4 downto 0) := "01111";
+constant A_M17 : STD_LOGIC_VECTOR (4 downto 0) := "00010";
+constant B_M17 : STD_LOGIC_VECTOR (4 downto 0) := "00010";
+constant GX_M17 : STD_LOGIC_VECTOR (4 downto 0) := "00111";
+constant GY_M17 : STD_LOGIC_VECTOR (4 downto 0) := "00110";
 
 end ECC_STANDARD;
 

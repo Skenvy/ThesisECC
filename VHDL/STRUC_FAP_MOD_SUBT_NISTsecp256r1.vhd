@@ -19,12 +19,16 @@
 ----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+use work.VECTOR_STANDARD.ALL;
+use work.ECC_STANDARD.ALL;
 
---Subtraction_Modulo_256
 entity STRUC_FAP_MOD_SUBT_NISTsecp256r1 is
-    Port ( Minuend : in  STD_LOGIC_VECTOR (255 downto 0); --Assumed to be less than the prime, not tested
-           Subtrahend : in  STD_LOGIC_VECTOR (255 downto 0); --Assumed to be less than the prime, not tested
-           Difference : out  STD_LOGIC_VECTOR (255 downto 0)); --(Minuend - Subtrahend = Difference)
+    Port ( Minuend : in  STD_LOGIC_VECTOR (255 downto 0); 
+			  --Assumed to be less than the prime, not tested
+           Subtrahend : in  STD_LOGIC_VECTOR (255 downto 0); 
+			  --Assumed to be less than the prime, not tested
+           Difference : out  STD_LOGIC_VECTOR (255 downto 0)); 
+			  --(Minuend - Subtrahend = Difference)
 end STRUC_FAP_MOD_SUBT_NISTsecp256r1;
 
 architecture Behavioral of STRUC_FAP_MOD_SUBT_NISTsecp256r1 is
@@ -33,12 +37,8 @@ architecture Behavioral of STRUC_FAP_MOD_SUBT_NISTsecp256r1 is
 -----CONSTANTS DECLARATIONS-----
 --------------------------------
 
---NIST-secp256r1-Prime
-constant Prime : STD_LOGIC_VECTOR (255 downto 0) := X"FFFF_FFFF_0000_0001_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF";
---The 2's Compliment of the NIST-secp256r1-Prime
-constant PrimeInverse : STD_LOGIC_VECTOR (255 downto 0) := X"0000_0000_FFFF_FFFE_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_0000_0000_0000_0000_0000_0001";
---A 256 bit vector populated by only zeroes
-constant ZeroVector : STD_LOGIC_VECTOR (255 downto 0) := X"0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000";
+constant Prime : STD_LOGIC_VECTOR (255 downto 0) := SECp256r1(0);
+constant PrimeInverse : STD_LOGIC_VECTOR (255 downto 0) := Prime_NISTsecp256r1_2Compliment;
 
 --------------------------------
 -----COMPONENT DECLARATIONS-----
@@ -48,27 +48,30 @@ constant ZeroVector : STD_LOGIC_VECTOR (255 downto 0) := X"0000_0000_0000_0000_0
 component STRUC_FAP_LIN_ADDR_RCAKS_256
 	port( SummandA : in  STD_LOGIC_VECTOR (255 downto 0);
          SummandB : in  STD_LOGIC_VECTOR (255 downto 0);
-         Summation : out  STD_LOGIC_VECTOR (256 downto 0) --(Summation = A+B, Cout in Sum(256))
+         Summation : out  STD_LOGIC_VECTOR (256 downto 0) 
+			--(Summation = A+B, Cout in Sum(256))
 		);
 end component;
 
---256 bit "Greater Than" Check (Included as component for future implementation as a structural unit, currently implemented behaviourally)
+--256 bit "Greater Than" Check
 component STRUC_UTIL_IsGreater_256
 	port( A : in  STD_LOGIC_VECTOR (255 downto 0);
          B : in  STD_LOGIC_VECTOR (255 downto 0);
-         IsGreater : out  STD_LOGIC --1 iff A > B, else 0
+         IsGreater : out  STD_LOGIC 
+			--1 iff A > B, else 0
 		);
 end component;
 
---256 bit "Equal To" Check (Included as component for future implementation as a structural unit, currently implemented behaviourally)
+--256 bit "Equal To" Check
 component STRUC_UTIL_IsEqual_256
 	port( A : in  STD_LOGIC_VECTOR (255 downto 0);
          B : in  STD_LOGIC_VECTOR (255 downto 0);
-         IsEqual : out  STD_LOGIC --1 iff A = B, else 0
+         IsEqual : out  STD_LOGIC 
+			--1 iff A = B, else 0
 		);
 end component;
 
---256 bit 2's Complimenter (Included as component for future implementation as a structural unit, currently implemented semi-behaviourally)
+--256 bit 2's Complimenter
 component STRUC_UTIL_2sCompliment_256
 	port( InVal : in  STD_LOGIC_VECTOR (255 downto 0);
          InComplimented : out  STD_LOGIC_VECTOR (255 downto 0)

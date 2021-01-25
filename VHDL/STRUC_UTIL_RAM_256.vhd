@@ -30,15 +30,9 @@ end STRUC_UTIL_RAM_256;
 
 architecture Behavioral of STRUC_UTIL_RAM_256 is
 
------------------------------
------SIGNAL DECLARATIONS-----
------------------------------
-
 signal DataInternal : STD_LOGIC_VECTOR ((N-1) downto 0) := ZeroVector;
 
 begin
-
---Data <= (others => 'Z') when (((WE = '1') or (RE = '0')) or ((WE = '0') and (RE = '1') and ((not (Data = DataInternal)) and (not (Data = ImpedeVector))))) else DataInternal;
 
 process(CLK)
 begin

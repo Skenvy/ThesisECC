@@ -2,9 +2,9 @@
 -- Company: 
 -- Engineer: 
 -- 
--- Create Date:    03:11:46 06/05/2017 
+-- Create Date:    23:52:41 06/10/2017 
 -- Design Name: 
--- Module Name:    GENERIC_ECC_ECDSA_CLOCKED_PARAMETERISED - Behavioral 
+-- Module Name:    GENERIC_ECC_ECDSA_CLOCKED_SHARED - Behavioral 
 -- Project Name: 
 -- Target Devices: 
 -- Tool versions: 
@@ -22,7 +22,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use work.VECTOR_STANDARD.ALL;
 use work.ECC_STANDARD.ALL;
 
-entity GENERIC_ECC_ECDSA_CLOCKED_PARAMETERISED is
+entity GENERIC_ECC_ECDSA_CLOCKED_SHARED is
     Generic (N : natural := VecLen; --VecLen  must match Parameter Size
 				 M : Natural := MultLen;
 				 AddrDelay : Time := 30 ns;
@@ -99,28 +99,11 @@ entity GENERIC_ECC_ECDSA_CLOCKED_PARAMETERISED is
 			  --1101: Valid SVA Attempt: Signature is valid (Message Flag)
 			  --1110: 
 			  --1111: 
-end GENERIC_ECC_ECDSA_CLOCKED_PARAMETERISED;
+end GENERIC_ECC_ECDSA_CLOCKED_SHARED;
 
-architecture Behavioral of GENERIC_ECC_ECDSA_CLOCKED_PARAMETERISED is
+architecture Behavioral of GENERIC_ECC_ECDSA_CLOCKED_SHARED is
 
-COMPONENT GENERIC_ECC_AFFINE_POINT_MULTIPLY_CLOCKED
-Generic (N : natural;
-			M : Natural;
-			AddrDelay : Time;
-			CompDelay : Time;
-			Toomed : Boolean);
-Port ( KEY : in  STD_LOGIC_VECTOR ((N-1) downto 0);
-       APX : in STD_LOGIC_VECTOR ((N-1) downto 0);
-       APY : in STD_LOGIC_VECTOR ((N-1) downto 0);
-       AQX : out STD_LOGIC_VECTOR ((N-1) downto 0);
-       AQY : out STD_LOGIC_VECTOR ((N-1) downto 0);
-		 Modulus : In  STD_LOGIC_VECTOR ((N-1) downto 0);
-		 ECC_A : In  STD_LOGIC_VECTOR ((N-1) downto 0);
-		 CLK : IN STD_LOGIC;
-		 StableOutput : out STD_LOGIC);
-END COMPONENT;
-
-component GENERIC_ECC_JACOBIAN_POINT_ADDITION_CLOCKED is
+component GENERIC_ECC_JACOBIAN_POINT_ADDITION_CLOCKED
     Generic (NGen : natural;
 				 MGen : Natural;
 				 AddrDelay : Time;
@@ -136,6 +119,24 @@ component GENERIC_ECC_JACOBIAN_POINT_ADDITION_CLOCKED is
            CY : out  STD_LOGIC_VECTOR ((NGen-1) downto 0);
            CZ : out  STD_LOGIC_VECTOR ((NGen-1) downto 0);
 			  Modulus : In  STD_LOGIC_VECTOR ((NGen-1) downto 0);
+			  CLK : IN STD_LOGIC;
+			  StableOutput : out STD_LOGIC);
+end component;
+
+component GENERIC_ECC_JACOBIAN_POINT_DOUBLE_CLOCKED
+    Generic (NGen : natural := VecLen;
+				 MGen : Natural := MultLen;
+				 AddrDelay : Time := 30 ns;
+				 CompDelay : Time := 30 ns;
+				 Toomed : Boolean := false);
+    Port ( AX : in  STD_LOGIC_VECTOR ((NGen-1) downto 0);
+           AY : in  STD_LOGIC_VECTOR ((NGen-1) downto 0);
+           AZ : in  STD_LOGIC_VECTOR ((NGen-1) downto 0);
+           CX : out  STD_LOGIC_VECTOR ((NGen-1) downto 0);
+           CY : out  STD_LOGIC_VECTOR ((NGen-1) downto 0);
+           CZ : out  STD_LOGIC_VECTOR ((NGen-1) downto 0);
+			  Modulus : In  STD_LOGIC_VECTOR ((NGen-1) downto 0);
+			  ECC_A : In  STD_LOGIC_VECTOR ((NGen-1) downto 0);
 			  CLK : IN STD_LOGIC;
 			  StableOutput : out STD_LOGIC);
 end component;
@@ -193,24 +194,6 @@ end component;
 signal DATABUSIN : STD_LOGIC_VECTOR (((2*N)-1) downto 0);
 signal CLK_QUAD : STD_LOGIC_VECTOR (1 downto 0) := "00";
 
-----------------------
---PM and Inverter IO--
-----------------------
-
-signal PM_KEY : STD_LOGIC_VECTOR ((N-1) downto 0);
-signal PM_APX : STD_LOGIC_VECTOR ((N-1) downto 0);
-signal PM_APY : STD_LOGIC_VECTOR ((N-1) downto 0);
-signal PM_AQX : STD_LOGIC_VECTOR ((N-1) downto 0);
-signal PM_AQY : STD_LOGIC_VECTOR ((N-1) downto 0);
-signal PM_Modulus : STD_LOGIC_VECTOR ((N-1) downto 0);
-signal PM_ECC_A : STD_LOGIC_VECTOR ((N-1) downto 0);
-signal PM_StableOutput : STD_LOGIC;
-signal INV_ELEMENT : STD_LOGIC_VECTOR ((N-1) downto 0) := UnitVector;
-signal INV_INVERSE : STD_LOGIC_VECTOR ((N-1) downto 0);
-signal INV_MODULUS : STD_LOGIC_VECTOR ((N-1) downto 0) := (1 => '1', others => '0');
-signal DSA_INVERSE : STD_LOGIC_VECTOR ((N-1) downto 0); --Holds the output from the port map
-signal INV_INVERSE_STABLE : STD_LOGIC;
-
 -----------------------
 --Command Stabilities--
 -----------------------
@@ -246,12 +229,14 @@ signal DSA_MULTU_B : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTU_P : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTU_M : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_U : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal DSA_U2 : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTU_STABLE : STD_LOGIC;
 signal DSA_MULTV_A : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTV_B : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTV_P : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTV_M : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_V : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal DSA_V2 : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_MULTV_STABLE : STD_LOGIC;
 signal DSA_ADDRW_A : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
 signal DSA_ADDRW_B : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
@@ -274,6 +259,88 @@ signal SIGNATURE_VERIFY : STD_LOGIC;
 signal SIGNATURE_VERIFIED : STD_LOGIC;
 signal OP_UNIVERSAL : STD_LOGIC := '0';
 signal OP_PHASELOCK : STD_LOGIC_VECTOR (1 downto 0) := "11";
+signal SGA_PHASELOCK : STD_LOGIC := '0';
+signal SVA_PHASELOCK : STD_LOGIC := '0';
+signal SGA_TERMINAL : STD_LOGIC := '0';
+signal SVA_TERMINAL : STD_LOGIC := '0';
+signal JPM_PHASELOCK : STD_LOGIC := '0';
+signal APM_PHASELOCK : STD_LOGIC := '0';
+signal APM_TERMINAL : STD_LOGIC := '0';
+signal JPA_SVA_SPECIAL : STD_LOGIC;
+----------------
+--PM REGISTERS--
+----------------
+signal PM_Modulus : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal PM_ECC_A : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal PM_StableOutput : STD_LOGIC;
+signal PM_KEY : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_MOD : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_ECA : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_APX : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_APY : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_AQX : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_AQY : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_ASTO : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_JPX : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_JPY : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_JPZ : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_JQX : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_JQY : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_JQZ : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal PM_JSTO : STD_LOGIC_VECTOR((N-1) downto 0) := (others => '0');
+signal INV_ELEMENT : STD_LOGIC_VECTOR ((N-1) downto 0) := UnitVector;
+signal INV_INVERSE : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal INV_MODULUS : STD_LOGIC_VECTOR ((N-1) downto 0) := (1 => '1', others => '0');
+signal DSA_INVERSE : STD_LOGIC_VECTOR ((N-1) downto 0); --Holds the output from the port map
+signal INV_INVERSE_STABLE : STD_LOGIC;
+signal APM_ROUNDS : STD_LOGIC_VECTOR(6 downto 0) := (others => '0');
+--MemoryDataLine
+signal MemDoublingX : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal MemDoublingY : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal MemDoublingZ : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal MemAddingX : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal MemAddingY : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal MemAddingZ : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal MemNonceX : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal MemNonceY : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal MemNonceZ : STD_LOGIC_VECTOR ((N-1) downto 0);
+--Temporal Adder Inputs and Outputs for the port map
+signal ADDRAX : STD_LOGIC_VECTOR ((N-1) downto 0) := (others => '0');
+signal ADDRAY : STD_LOGIC_VECTOR ((N-1) downto 0) := (others => '0');
+signal ADDRAZ : STD_LOGIC_VECTOR ((N-1) downto 0) := (others => '0');
+signal ADDRBX : STD_LOGIC_VECTOR ((N-1) downto 0) := (others => '0');
+signal ADDRBY : STD_LOGIC_VECTOR ((N-1) downto 0) := (others => '0');
+signal ADDRBZ : STD_LOGIC_VECTOR ((N-1) downto 0) := (others => '0');
+signal ADDRCX : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal ADDRCY : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal ADDRCZ : STD_LOGIC_VECTOR ((N-1) downto 0);
+--Temporal Doubling Inputs and Outputs for the port map
+signal DOUBAX : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal DOUBAY : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal DOUBAZ : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal DOUBCX : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal DOUBCY : STD_LOGIC_VECTOR ((N-1) downto 0);
+signal DOUBCZ : STD_LOGIC_VECTOR ((N-1) downto 0);
+--Used to control whether the stabalised outputs are displayed or not, turns to '1' when they are stable.
+signal StableOutputJPM : STD_LOGIC;
+--Used to record the previous state of the input, to reflush and restart the procedure when new inputs are given
+signal PreviousJPX : STD_LOGIC_VECTOR((N-1) downto 0);
+signal PreviousJPY : STD_LOGIC_VECTOR((N-1) downto 0);
+signal PreviousJPZ : STD_LOGIC_VECTOR((N-1) downto 0);
+signal PreviousKEY : STD_LOGIC_VECTOR((N-1) downto 0);
+--Hold the index and used to check that the entirety of K has been realised
+signal Jindex : STD_LOGIC_VECTOR((N-1) downto 0);
+signal JComplete : STD_LOGIC_VECTOR((N-1) downto 0);
+signal Jnext : STD_LOGIC_VECTOR((N-1) downto 0);
+signal CLKDBL : STD_LOGIC; --Used to offset the input to output timing for inputs to the addr and doub cells, to place inputs on them in one clock cycle and then continuously check the output stability in every following clock cycles
+--Stability
+signal StableADDR : STD_LOGIC;
+signal StableDOUB : STD_LOGIC;
+signal J_Finished : STD_LOGIC;
+signal Adding_Round : STD_LOGIC;
+signal Adding_Round_Next : STD_LOGIC;
+signal JK : STD_LOGIC_VECTOR((N-1) downto 0);
+signal JKnext : STD_LOGIC_VECTOR((N-1) downto 0);
 -------
 --RW!--
 -------
@@ -330,6 +397,7 @@ signal RW_HASH_Input : STD_LOGIC := '0';
 signal DATA_HASH_Input : STD_LOGIC_VECTOR (((2*N)-1) downto 0) := (others => '0');
 
 begin
+
 
 --------------------------------------------------------------------------
 ---------------------------DATA CELLS: RW PINS----------------------------
@@ -520,46 +588,84 @@ RAM_HASH_Input : GENERIC_UTIL_RAM_CLOCKED
 										 --Reading is only enhabled if Data is latched with (others => 'Z')
            Data => DATA_HASH_Input,
 			  CLK => CLK);
---
+			  
+--------------------------------------------------
+-----JACOBIAN POINT MULTIPLIER CELL PORT MAPS-----
+--------------------------------------------------
+			  
+ADDRROUND : GENERIC_FAP_RELATIONAL
+	 Generic Map (N => N,
+				 VType => 0) --0 for just equality, 1 for Greater Than test : Default 1
+    Port Map ( A => JK,
+           B => ZeroVector,
+           E => Adding_Round,
+           G => open);
+			  
+ADDRROUNDNEXT : GENERIC_FAP_RELATIONAL
+	 Generic Map (N => N,
+				 VType => 0) --0 for just equality, 1 for Greater Than test : Default 1
+    Port Map ( A => JKnext,
+           B => ZeroVector,
+           E => Adding_Round_Next,
+           G => open);
 
---------------------------------------------------------------------------
--------------AFFINE POINT MULTIPLIER and JACOBIAN POINT ADDER-------------
---------------------------------------------------------------------------
-
-apm : GENERIC_ECC_AFFINE_POINT_MULTIPLY_CLOCKED
-Generic Map (N => N,
-			M => M,
-			AddrDelay => AddrDelay,
-			CompDelay => CompDelay,
-			Toomed => Toomed)
-Port Map ( KEY => PM_KEY,
-       APX => PM_APX,
-       APY => PM_APY,
-       AQX => PM_AQX,
-       AQY => PM_AQY,
-		 Modulus => PM_Modulus,
-		 ECC_A => PM_ECC_A,
-		 CLK => CLK,
-		 StableOutput => PM_StableOutput);
-		 
-jpa : GENERIC_ECC_JACOBIAN_POINT_ADDITION_CLOCKED
+--The adder cell
+ADDR : GENERIC_ECC_JACOBIAN_POINT_ADDITION_CLOCKED
     Generic Map (NGen => N,
-				 MGen => M,
-				 AddrDelay => AddrDelay,
-				 CompDelay => CompDelay,
-				 Toomed => Toomed)
-    Port Map ( AX => DSA_PM_ByG_X,
-           AY => DSA_PM_ByG_Y,
-           AZ => UnitVector,
-           BX => DSA_PM_ByQ_X,
-           BY => DSA_PM_ByQ_Y,
-           BZ => UnitVector,
-           CX => DSA_JPA_JQX,
-           CY => DSA_JPA_JQY,
-           CZ => DSA_JPA_JQZ,
-			  Modulus => DATA_Curve_Prime,
-			  CLK => CLK,
-			  StableOutput => DSA_JPA_STABLE);
+					  MGen => M,
+				 	  AddrDelay => AddrDelay,
+				 	  CompDelay => CompDelay,
+				 	  Toomed => Toomed)
+    Port Map ( AX => ADDRAX,
+					AY => ADDRAY,
+					AZ => ADDRAZ,
+					BX => ADDRBX,
+					BY => ADDRBY,
+					BZ => ADDRBZ,
+					CX => ADDRCX,
+					CY => ADDRCY,
+					CZ => ADDRCZ,
+					Modulus => PM_MOD,
+					CLK => CLK,
+					StableOutput => StableADDR);
+
+--The doubling cell
+DOUB : GENERIC_ECC_JACOBIAN_POINT_DOUBLE_CLOCKED
+    Generic Map (NGen => N,
+					  MGen => M,
+				 	  AddrDelay => AddrDelay,
+				 	  CompDelay => CompDelay,
+				 	  Toomed => Toomed)
+    Port Map ( AX => DOUBAX,
+					AY => DOUBAY,
+					AZ => DOUBAZ,
+					CX => DOUBCX,
+					CY => DOUBCY,
+					CZ => DOUBCZ,
+					Modulus => PM_MOD,
+					ECC_A => PM_ECA,
+					CLK => CLK,
+					StableOutput => StableDOUB);
+					
+--Connecting the data bus lines of the ports.
+
+DOUBAX <= MemDoublingX;
+DOUBAY <= MemDoublingY;
+DOUBAZ <= MemDoublingZ;
+JK <= (Jindex and PM_KEY);
+JKnext <= (Jnext and PM_KEY);
+
+--Determine the ADDR inputs each round
+JPA_SVA_SPECIAL <= ((STABILITY_ECDSA_ROUNDS(8) and (not STABILITY_ECDSA_ROUNDS(10)) and (not Command(3))) and (Command(2) and Command(1) and Command(0)));
+OutGen : for K in 0 to (N-1) generate
+begin
+	ADDRAX(K) <= ((((MemAddingX(K) and ((not Adding_Round) or (not Adding_Round_Next))) or (MemNonceX(K) and (Adding_Round and Adding_Round_Next))) and (not JPA_SVA_SPECIAL)) or (DSA_PM_ByQ_X(K) and JPA_SVA_SPECIAL));
+	ADDRAY(K) <= ((((MemAddingY(K) and ((not Adding_Round) or (not Adding_Round_Next))) or (MemNonceY(K) and (Adding_Round and Adding_Round_Next))) and (not JPA_SVA_SPECIAL)) or (DSA_PM_ByQ_Y(K) and JPA_SVA_SPECIAL));
+	ADDRAZ(K) <= ((((MemAddingZ(K) and ((not Adding_Round) or (not Adding_Round_Next))) or (MemNonceZ(K) and (Adding_Round and Adding_Round_Next))) and (not JPA_SVA_SPECIAL)) or (UnitVector(K) and JPA_SVA_SPECIAL));
+	ADDRBX(K) <= ((MemDoublingX(K) and (not JPA_SVA_SPECIAL)) or (DSA_PM_ByG_X(K) and JPA_SVA_SPECIAL));
+	ADDRBY(K) <= ((MemDoublingY(K) and (not JPA_SVA_SPECIAL)) or (DSA_PM_ByG_Y(K) and JPA_SVA_SPECIAL));
+	ADDRBZ(K) <= ((MemDoublingZ(K) and (not JPA_SVA_SPECIAL)) or (UnitVector(K) and JPA_SVA_SPECIAL));
+end generate OutGen;
 		 
 --------------------------------------------------------------------------
 ----------------------MODULO INVERTER and FAP RELATOR---------------------
@@ -656,9 +762,685 @@ begin
 			OP_PHASELOCK <= "10";
 		elsif (OP_PHASELOCK = "10") then
 			OP_PHASELOCK <= "11";
+		elsif ((Command_Previous = Command) and (JPM_PHASELOCK = '1') and (APM_PHASELOCK = '1')) then
+				--Do standard Jacobian PM
+				if (J_Finished = '1') then --If end condition met, put output
+					DSA_JQX <= MemAddingX;
+					DSA_JQY <= MemAddingY;
+					DSA_JQZ <= MemAddingZ;
+					StableOutputJPM <= '1';
+					if (CLK_QUAD = "00") then
+						CLK_QUAD <= "01";
+					elsif (CLK_QUAD = "01") then
+						CLK_QUAD <= "10";
+					elsif (CLK_QUAD = "10") then
+						CLK_QUAD <= "11";
+					else
+						--At the end, switch off the JPM_PHASELOCK
+						JPM_PHASELOCK <= '0';
+						APM_ROUNDS <= (others => '0');
+						CLK_QUAD <= "00";
+					end if;
+				elsif (CLKDBL = '0') then
+					CLKDBL <= '1';
+				elsif ((StableADDR and StableDOUB) = '1') then --Else, if the cells are stable, do the update.
+					if (Adding_Round = '0') then --if adding bit, then do the adding (zero from 'not' equal to the ZSeroVector)
+						MemAddingX <= ADDRCX;
+						MemAddingY <= ADDRCY;
+						MemAddingZ <= ADDRCZ;
+					else
+						MemNonceX <= ADDRCX;
+						MemNonceY <= ADDRCY;
+						MemNonceZ <= ADDRCZ;
+					end if; 
+					--Do the doubling unambiguously.
+					MemDoublingX <= DOUBCX;
+					MemDoublingY <= DOUBCY;
+					MemDoublingZ <= DOUBCZ;
+					if (Jindex(N-1) = '1') then
+						J_Finished <= '1';
+					end if;
+					Jindex <= Jindex((N-2) downto 0) & "0";
+					Jnext <= Jnext((N-2) downto 0) & "0";
+					JComplete <= (JComplete or JK);
+					CLKDBL <= '0';
+				end if;
+		elsif ((Command_Previous = Command) and (JPM_PHASELOCK = '0') and (APM_PHASELOCK = '1')) then
+			--Do standard Affine PM using the JPM results
+			if (APM_ROUNDS(6) = '1') then
+				--Compute APX and APY (over Curve) between uG and vQ
+				--CAPTURE OUTPUTS
+				if ((DSA_MULTV_STABLE and DSA_MULTU_STABLE) = '1') then
+					DSA_V <= DSA_MULTV_P; --DSA_V now contains APY
+					DSA_U <= DSA_MULTU_P; --DSA_U now contains APX
+					CLK_QUAD <= "11";
+					--At the end, switch off the APM_PHASELOCK
+					APM_PHASELOCK <= '0';
+					--At the end, switch on the APM_TERMINAL
+					APM_TERMINAL <= '1';
+				end if;
+			elsif (APM_ROUNDS(5) = '1') then
+				--Compute APX and APY (over Curve) between uG and vQ
+				--SETUP INPUTS
+				DSA_MULTU_A <= DSA_JQX;
+				DSA_MULTU_B <= DSA_JQZ_INV_SQUARED;
+				DSA_MULTU_M <= DATA_Curve_Prime;
+				DSA_MULTV_A <= DSA_JQY;
+				DSA_MULTV_B <= DSA_JQZ_INV_CUBED;
+				DSA_MULTV_M <= DATA_Curve_Prime;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					APM_ROUNDS(6) <= '1';
+				end if;
+			elsif (APM_ROUNDS(4) = '1') then
+				--Compute JPZ_INV_CUBED (over Curve) between uG and vQ
+				--CAPTURE OUTPUTS
+				if ((DSA_MULTV_STABLE) = '1') then
+					DSA_JQZ_INV_CUBED <= DSA_MULTV_P;
+					APM_ROUNDS(5) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (APM_ROUNDS(3) = '1') then
+				--Compute JPZ_INV_CUBED (over Curve) between uG and vQ
+				--SETUP INPUTS
+				DSA_MULTV_A <= DSA_JQZ_INV;
+				DSA_MULTV_B <= DSA_JQZ_INV_SQUARED;
+				DSA_MULTV_M <= DATA_Curve_Prime;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					APM_ROUNDS(4) <= '1';
+				end if;
+			elsif (APM_ROUNDS(2) = '1') then
+				--Compute JPZ_INV_SQUARED (over Curve) between uG and vQ
+				--CAPTURE OUTPUTS
+				if ((DSA_MULTU_STABLE) = '1') then
+					DSA_JQZ_INV_SQUARED <= DSA_MULTU_P;
+					APM_ROUNDS(3) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (APM_ROUNDS(1) = '1') then
+				--Compute JPZ_INV_SQUARED (over Curve) between uG and vQ
+				--SETUP INPUTS
+				DSA_MULTU_A <= DSA_JQZ_INV;
+				DSA_MULTU_B <= DSA_JQZ_INV;
+				DSA_MULTU_M <= DATA_Curve_Prime;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					APM_ROUNDS(2) <= '1';
+				end if;
+			elsif (APM_ROUNDS(0) = '1') then
+				--Compute JPZ_INV (over Curve) between uG and vQ
+				--CAPTURE OUTPUTS
+				if (INV_INVERSE_STABLE = '0') then
+					DSA_JQZ_INV <= INV_INVERSE;
+					APM_ROUNDS(1) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			else
+				--Compute JPZ_INV (over Curve) between uG and vQ
+				--SETUP INPUTS
+				INV_ELEMENT <= DSA_JQZ;
+				INV_MODULUS <= DATA_Curve_Prime;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					APM_ROUNDS(0) <= '1';
+				end if;
+			end if;
+		elsif ((Command_Previous = Command) and (SGA_PHASELOCK = '1') and (SGA_TERMINAL = '0')) then
+			--Implement ECDSA-SGA
+			if (STABILITY_ECDSA_ROUNDS(15) = '1') then
+				--Assert Signature_S != 0 (Recompute Signature_K otherwise)
+				--CAPTURE OUTPUTS
+				if ((not SIGNATURE_STABLE) = '1') then --for 'Not' Equal ZeroVector
+					STABILITY_ECDSA_SGA <= '1';
+					DATABUSIN <= Signature_R & DSA_U; --DATA_Signature_R --DATA_Signature_S
+					OP_PHASELOCK <= "00";
+					CLK_QUAD <= "00";
+					StableOutput <= '1';
+					SGA_TERMINAL <= '1';
+				else
+					Error <= "1001"; --1001: Invalid SGA Attempt: Signature_K prompts Signature_S = 0 (Error Flag: IRQ requests new Signature_K)
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(14) = '1') then
+				--Assert Signature_S != 0 (Recompute Signature_K otherwise)
+				--SETUP INPUTS
+				SIGNATURE_STABLILITY_CHECK <= DSA_U;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(15) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(13) = '1') then
+				--Compute (MULT) Signature_S = (Signature_K * (E + (Key_Private * Signature_R))) mod Curve_N
+				--CAPTURE OUTPUTS
+				if ((DSA_MULTU_STABLE) = '1') then
+					DSA_U <= DSA_MULTU_P; --DSA_U now contains Signature_S
+					STABILITY_ECDSA_ROUNDS(14) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(12) = '1') then
+				--Compute (MULT) Signature_S = (Signature_K * (E + (Key_Private * Signature_R))) mod Curve_N
+				--SETUP INPUTS
+				DSA_MULTU_A <= DSA_INVERSE;
+				DSA_MULTU_B <= DSA_W;
+				DSA_MULTU_M <= DATA_Curve_N;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(13) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(11) = '1') then
+				--Compute (ADDR) (E + (Key_Private * Signature_R)) mod Curve_N
+				--CAPTURE OUTPUTS
+				DSA_W <= DSA_ADDRW_S; --DSA_W is now (E + (Key_Private * Signature_R))
+				STABILITY_ECDSA_ROUNDS(12) <= '1';
+				CLK_QUAD <= "00";
+			elsif (STABILITY_ECDSA_ROUNDS(10) = '1') then
+				--Compute (ADDR) (E + (Key_Private * Signature_R)) mod Curve_N
+				--SETUP INPUTS
+				DSA_ADDRW_A <= DATA_HASH_Total;
+				DSA_ADDRW_B <= DSA_V;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(11) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(9) = '1') then
+				--Compute (MULT) (Key_Private * Signature_R) mod Curve_N
+				--CAPTURE OUTPUTS
+				if ((DSA_MULTV_STABLE) = '1') then
+					DSA_V <= DSA_MULTV_P;
+					STABILITY_ECDSA_ROUNDS(10) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(8) = '1') then
+				--Compute (MULT) (Key_Private * Signature_R) mod Curve_N
+				--SETUP INPUTS
+				DSA_MULTV_A <= DATA_Key_Private;
+				DSA_MULTV_B <= SIGNATURE_R;
+				DSA_MULTV_M <= DATA_Curve_N;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(9) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(7) = '1') then
+				--Assert Signature_R != 0 (Recompute Signature_K otherwise)
+				--CAPTURE OUTPUTS
+				if ((not SIGNATURE_STABLE) = '1') then --for 'Not' Equal ZeroVector
+					STABILITY_ECDSA_ROUNDS(8) <= '1';
+					SIGNATURE_R <= DSA_W;
+					CLK_QUAD <= "00";
+				else
+					Error <= "1000"; --1000: Invalid SGA Attempt: Signature_K prompts Signature_R = 0 (Error Flag: IRQ requests new Signature_K)
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(6) = '1') then
+				--Assert Signature_R != 0 (Recompute Signature_K otherwise)
+				--SETUP INPUTS
+				SIGNATURE_STABLILITY_CHECK <= DSA_W;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(7) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(5) = '1') then
+				--Compute Signature_R = (Signature_K * G).X mod Curve_N
+				--CAPTURE OUTPUTS
+				DSA_W <= DSA_ADDRW_S; --DSA_W is now Signature_R
+				STABILITY_ECDSA_ROUNDS(6) <= '1';
+				CLK_QUAD <= "00";
+			elsif (STABILITY_ECDSA_ROUNDS(4) = '1') then
+				--Compute Signature_R = (Signature_K * G).X mod Curve_N
+				--SETUP INPUTS
+				DSA_ADDRW_A <= DSA_PM_ByG_X;
+				DSA_ADDRW_B <= ZeroVector;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(5) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(3) = '1') then
+				--Compute 1 PM (over Curve) of (Signature_K * G)
+				--CAPTURE OUTPUTS
+				if (APM_TERMINAL = '1') then
+					DSA_PM_ByG_X <= DSA_U;
+					DSA_PM_ByG_Y <= DSA_V;
+					STABILITY_ECDSA_ROUNDS(4) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(2) = '1') then
+				--Compute 1 PM (over Curve) of (Signature_K * G)
+				--SETUP INPUTS
+				if (CLK_QUAD = "00") then
+					--Inputs to the APM: Select
+					PM_KEY <= DATA_Signature_K; --K
+					PM_MOD <= DATA_Curve_Prime;
+					PM_ECA <= DATA_Curve_A;
+					MemDoublingX <= DATA_Curve_GX; --APX
+					MemDoublingY <= DATA_Curve_GY; --APY
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					--Inputs to the JPM: Initiate
+					MemDoublingZ <= UnitVector;
+					MemAddingX <= UnitVector;
+					MemAddingY <= UnitVector;
+					MemAddingZ <= ZeroVector;
+					MemNonceX <= UnitVector;
+					MemNonceY <= UnitVector;
+					MemNonceZ <= ZeroVector;
+					Jindex <= UnitVector;
+					JComplete <= ZeroVector;
+					Jnext <= UnitVector((N-2) downto 0) & "0";
+					CLKDBL <= '0';
+					J_Finished <= '0';
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					--Inputs to the APM: Initiate
+					APM_PHASELOCK <= '1';
+					JPM_PHASELOCK <= '1';
+					APM_TERMINAL <= '0';
+					StableOutputJPM <= '0';
+					CLK_QUAD <= "11";
+				elsif (APM_TERMINAL = '1') then
+					STABILITY_ECDSA_ROUNDS(3) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(1) = '1') then
+				--Compute Inverse (over Curve_N) of Signature_K
+				--CAPTURE OUTPUTS
+				if (INV_INVERSE_STABLE = '0') then
+					DSA_INVERSE <= INV_INVERSE;
+					STABILITY_ECDSA_ROUNDS(2) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(0) = '1') then
+				--Compute Inverse (over Curve_N) of Signature_K
+				--SETUP INPUTS
+				INV_ELEMENT <= DATA_Signature_K;
+				INV_MODULUS <= DATA_Curve_N;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(1) <= '1';
+				end if;
+			else
+				--Take E from DATA_HASH_Total
+				--Take Signature_K from DATA_Signature_K
+				CLK_QUAD <= "00";
+				STABILITY_ECDSA_ROUNDS(0) <= '1';
+			end if;
+		elsif ((Command_Previous = Command) and (SVA_PHASELOCK = '1') and (SVA_TERMINAL = '0')) then
+			--Implement the SVA
+			if (STABILITY_ECDSA_ROUNDS(21) = '1') then
+				--Assert that r = w (if yes, then success)
+				--CAPTURE OUTPUTS
+				SIGNATURE_VERIFIED <= SIGNATURE_VERIFY;
+				STABILITY_ECDSA_SVA <= '1';
+				StableOutput <= '1';
+				SVA_TERMINAL <= '1';
+				if (SIGNATURE_VERIFY = '0') then
+					Error <= "1100"; --1100: Invalid SVA Attempt: Signature is Invalid (Message Flag)
+				else
+					Error <= "1101"; --1101: Valid SVA Attempt: Signature is valid (Message Flag)
+				end if;
+				CLK_QUAD <= "00";
+			elsif (STABILITY_ECDSA_ROUNDS(20) = '1') then
+				--Assert that r = w (if yes, then success)
+				--SETUP INPUTS
+				--Inputs are fixed to the DSA_W and DATA_Signature_R registers, hold one round of the STABILITY_ECDSA to let Relator stabilise
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(21) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(19) = '1') then
+				--Compute w = (uG+vQ).X mod Curve_N
+				--CAPTURE OUTPUTS
+				DSA_W <= DSA_ADDRW_S;
+				STABILITY_ECDSA_ROUNDS(20) <= '1';
+				CLK_QUAD <= "00";
+			elsif (STABILITY_ECDSA_ROUNDS(18) = '1') then
+				--Compute w = (uG+vQ).X mod Curve_N
+				--SETUP INPUTS
+				DSA_ADDRW_A <= DSA_U;
+				DSA_ADDRW_B <= ZeroVector;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(19) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(17) = '1') then
+				--Compute APX and APY (over Curve) between uG and vQ
+				--CAPTURE OUTPUTS
+				if ((DSA_MULTV_STABLE and DSA_MULTU_STABLE) = '1') then
+					DSA_V <= DSA_MULTV_P; --DSA_V now contains APY
+					DSA_U <= DSA_MULTU_P; --DSA_U now contains APX
+					STABILITY_ECDSA_ROUNDS(18) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(16) = '1') then
+				--Compute APX and APY (over Curve) between uG and vQ
+				--SETUP INPUTS
+				DSA_MULTU_A <= DSA_JQX;
+				DSA_MULTU_B <= DSA_JQZ_INV_SQUARED;
+				DSA_MULTU_M <= DATA_Curve_Prime;
+				DSA_MULTV_A <= DSA_JQY;
+				DSA_MULTV_B <= DSA_JQZ_INV_CUBED;
+				DSA_MULTV_M <= DATA_Curve_Prime;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(17) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(15) = '1') then
+				--Compute JPZ_INV_CUBED (over Curve) between uG and vQ
+				--CAPTURE OUTPUTS
+				if ((DSA_MULTV_STABLE) = '1') then
+					DSA_JQZ_INV_CUBED <= DSA_MULTV_P;
+					STABILITY_ECDSA_ROUNDS(16) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(14) = '1') then
+				--Compute JPZ_INV_CUBED (over Curve) between uG and vQ
+				--SETUP INPUTS
+				DSA_MULTV_A <= DSA_JQZ_INV;
+				DSA_MULTV_B <= DSA_JQZ_INV_SQUARED;
+				DSA_MULTV_M <= DATA_Curve_Prime;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(15) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(13) = '1') then
+				--Compute JPZ_INV_SQUARED (over Curve) between uG and vQ
+				--CAPTURE OUTPUTS
+				if ((DSA_MULTU_STABLE) = '1') then
+					DSA_JQZ_INV_SQUARED <= DSA_MULTU_P;
+					STABILITY_ECDSA_ROUNDS(14) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(12) = '1') then
+				--Compute JPZ_INV_SQUARED (over Curve) between uG and vQ
+				--SETUP INPUTS
+				DSA_MULTU_A <= DSA_JQZ_INV;
+				DSA_MULTU_B <= DSA_JQZ_INV;
+				DSA_MULTU_M <= DATA_Curve_Prime;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(13) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(11) = '1') then
+				--Compute JPZ_INV (over Curve) between uG and vQ
+				--CAPTURE OUTPUTS
+				if (INV_INVERSE_STABLE = '0') then
+					DSA_JQZ_INV <= INV_INVERSE;
+					STABILITY_ECDSA_ROUNDS(12) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(10) = '1') then
+				--Compute JPZ_INV (over Curve) between uG and vQ
+				--SETUP INPUTS
+				INV_ELEMENT <= DSA_JQZ;
+				INV_MODULUS <= DATA_Curve_Prime;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(11) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(9) = '1') then
+				--Compute JPA (over Curve) between uG and vQ
+				--CAPTURE OUTPUTS
+				if (StableADDR = '1') then 
+					DSA_JQX <= ADDRCX;
+					DSA_JQY <= ADDRCY;
+					DSA_JQZ <= ADDRCZ;
+					STABILITY_ECDSA_ROUNDS(10) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(8) = '1') then
+				--Compute JPA (over Curve) between uG and vQ
+				--SETUP INPUTS
+				--Inputs tied permantently to the adder
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(9) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(7) = '1') then
+				--Compute PM (over Curve) of vQ (Q, the persons public key)
+				--CAPTURE OUTPUTS
+				if (APM_TERMINAL = '1') then
+					DSA_PM_ByQ_X <= DSA_U;
+					DSA_PM_ByQ_Y <= DSA_V;
+					STABILITY_ECDSA_ROUNDS(8) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(6) = '1') then
+				--Compute PM (over Curve) of vQ (Q, the persons public key)
+				--SETUP INPUTS
+				if (CLK_QUAD = "00") then
+					--Inputs to the APM: Select
+					PM_KEY <= DSA_V2; --U = ((S Inverse) * Hash)
+					PM_MOD <= DATA_Curve_Prime;
+					PM_ECA <= DATA_Curve_A;
+					MemDoublingX <= DATA_Key_Public_Other_X; --APX
+					MemDoublingY <= DATA_Key_Public_Other_Y; --APY
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					--Inputs to the JPM: Initiate
+					MemDoublingZ <= UnitVector;
+					MemAddingX <= UnitVector;
+					MemAddingY <= UnitVector;
+					MemAddingZ <= ZeroVector;
+					MemNonceX <= UnitVector;
+					MemNonceY <= UnitVector;
+					MemNonceZ <= ZeroVector;
+					Jindex <= UnitVector;
+					JComplete <= ZeroVector;
+					Jnext <= UnitVector((N-2) downto 0) & "0";
+					CLKDBL <= '0';
+					J_Finished <= '0';
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					--Inputs to the APM: Initiate
+					APM_PHASELOCK <= '1';
+					JPM_PHASELOCK <= '1';
+					APM_TERMINAL <= '0';
+					StableOutputJPM <= '0';
+					CLK_QUAD <= "11";
+				elsif (APM_TERMINAL = '1') then
+					--DSA_U & DSA_V; --vQ.X --vQ.Y
+					STABILITY_ECDSA_ROUNDS(7) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(5) = '1') then
+				--Compute PM (over Curve) of uG
+				--CAPTURE OUTPUTS
+				if (APM_TERMINAL = '1') then
+					DSA_PM_ByG_X <= DSA_U;
+					DSA_PM_ByG_Y <= DSA_V;
+					STABILITY_ECDSA_ROUNDS(6) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(4) = '1') then
+				--Compute PM (over Curve) of uG
+				--SETUP INPUTS
+				if (CLK_QUAD = "00") then
+					--Inputs to the APM: Select
+					PM_KEY <= DSA_U2; --U = ((S Inverse) * Hash)
+					PM_MOD <= DATA_Curve_Prime;
+					PM_ECA <= DATA_Curve_A;
+					MemDoublingX <= DATA_Curve_GX; --APX
+					MemDoublingY <= DATA_Curve_GY; --APY
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					--Inputs to the JPM: Initiate
+					MemDoublingZ <= UnitVector;
+					MemAddingX <= UnitVector;
+					MemAddingY <= UnitVector;
+					MemAddingZ <= ZeroVector;
+					MemNonceX <= UnitVector;
+					MemNonceY <= UnitVector;
+					MemNonceZ <= ZeroVector;
+					Jindex <= UnitVector;
+					JComplete <= ZeroVector;
+					Jnext <= UnitVector((N-2) downto 0) & "0";
+					CLKDBL <= '0';
+					J_Finished <= '0';
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					--Inputs to the APM: Initiate
+					APM_PHASELOCK <= '1';
+					JPM_PHASELOCK <= '1';
+					APM_TERMINAL <= '0';
+					StableOutputJPM <= '0';
+					CLK_QUAD <= "11";
+				elsif (APM_TERMINAL = '1') then
+					--DSA_U & DSA_V; --uG.X --uG.Y
+					STABILITY_ECDSA_ROUNDS(5) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(3) = '1') then
+				--Compute 2 MULTS (over Curve_N) of u(Signature_S_Inv * E) and v(Signature_S_Inv * Signature_R)
+				--CAPTURE OUTPUTS
+				if ((DSA_MULTV_STABLE and DSA_MULTU_STABLE) = '1') then
+					DSA_U2 <= DSA_MULTU_P; --U = ((S Inverse) * Hash)
+					DSA_V2 <= DSA_MULTV_P; --V = ((S Inverse) * R)
+					STABILITY_ECDSA_ROUNDS(4) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(2) = '1') then
+				--Compute 2 MULTS (over Curve_N) of u(Signature_S_Inv * E) and v(Signature_S_Inv * Signature_R)
+				--SETUP INPUTS
+				DSA_MULTV_A <= DSA_INVERSE;
+				DSA_MULTV_B <= DATA_Signature_R;
+				DSA_MULTV_M <= DATA_Curve_N;
+				DSA_MULTU_A <= DSA_INVERSE;
+				DSA_MULTU_B <= DATA_HASH_Total;
+				DSA_MULTU_M <= DATA_Curve_N;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(3) <= '1';
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(1) = '1') then
+				--Compute Inverse (over Curve_N) of Signature_S
+				--CAPTURE OUTPUTS
+				if (INV_INVERSE_STABLE = '0') then
+					DSA_INVERSE <= INV_INVERSE;
+					STABILITY_ECDSA_ROUNDS(2) <= '1';
+					CLK_QUAD <= "00";
+				end if;
+			elsif (STABILITY_ECDSA_ROUNDS(0) = '1') then
+				--Compute Inverse (over Curve_N) of Signature_S
+				--SETUP INPUTS
+				INV_ELEMENT <= DATA_Signature_S;
+				INV_MODULUS <= DATA_Curve_N;
+				if (CLK_QUAD = "00") then
+					CLK_QUAD <= "01";
+				elsif (CLK_QUAD = "01") then
+					CLK_QUAD <= "10";
+				elsif (CLK_QUAD = "10") then
+					CLK_QUAD <= "11";
+				else
+					STABILITY_ECDSA_ROUNDS(1) <= '1';
+				end if;
+			else
+				--Take E from DATA_HASH_Total
+				--Take Signature_R from DATA_Signature_R
+				--Take Signature_S from DATA_Signature_S
+				if (DATA_Signature_R = ZeroVector) then
+					Error <= "1010"; --1010: Invalid SVA Attempt: Signature_R is 0 (Error Flag: IRQ requests Signature rewrite)
+				elsif (DATA_Signature_S = ZeroVector) then
+					Error <= "1011"; --1011: Invalid SVA Attempt: Signature_S is 0 (Error Flag: IRQ requests Signature rewrite)
+				else
+					CLK_QUAD <= "00";
+					STABILITY_ECDSA_ROUNDS(0) <= '1';
+				end if;
+			end if;
 		elsif (((not Command(3)) and (not Command(2))) = '1') then
 			if (((not Command(1)) and (not Command(0))) = '1') then
 			--000: Not operating anything, In RW mode
+				SGA_PHASELOCK <= '0';
+				SVA_PHASELOCK <= '0';
 				if (RW = '1') then
 					StableOutput <= '0';
 					DATABUS <= (others => 'Z');
@@ -697,23 +1479,44 @@ begin
 				end if;
 			elsif (((not Command(1)) and Command(0)) = '1') then
 			--001: Generate Key_Private; PRNG(1,(N-1))
+				SGA_PHASELOCK <= '0';
+				SVA_PHASELOCK <= '0';
 				--Functionality not Implemented, Left as skeleton
 				--STABILITY_Generate_Key_Private <= $Stability Output of PRNG$;
 			elsif ((Command(1) and (not Command(0))) = '1') then
 			--010: Generate Key_Public
+				SGA_PHASELOCK <= '0';
+				SVA_PHASELOCK <= '0';
 				if (not (Command_Previous = Command)) then
 					Error <= "0000";
 					StableOutput <= '0';
-				else
+					--Inputs to the APM: Initiate
+					APM_PHASELOCK <= '1';
+					JPM_PHASELOCK <= '1';
+					APM_TERMINAL <= '0';
+					StableOutputJPM <= '0';
+					--Inputs to the JPM: Initiate
+					MemDoublingZ <= UnitVector;
+					MemAddingX <= UnitVector;
+					MemAddingY <= UnitVector;
+					MemAddingZ <= ZeroVector;
+					MemNonceX <= UnitVector;
+					MemNonceY <= UnitVector;
+					MemNonceZ <= ZeroVector;
+					Jindex <= UnitVector;
+					JComplete <= ZeroVector;
+					Jnext <= UnitVector((N-2) downto 0) & "0";
+					CLKDBL <= '0';
+					J_Finished <= '0';
+					--Inputs to the APM: Select
 					PM_KEY <= DATA_Key_Private;
-					PM_APX <= DATA_Curve_GX;
-					PM_APY <= DATA_Curve_GY;
-					DSA_U <= PM_AQX;
-					DSA_V <= PM_AQY;
-					PM_Modulus <= DATA_Curve_Prime;
-					PM_ECC_A <= DATA_Curve_A;
-					STABILITY_Generate_Key_Public <= PM_StableOutput;
-					if (STABILITY_Generate_Key_Public = '1') then
+					PM_MOD <= DATA_Curve_Prime;
+					PM_ECA <= DATA_Curve_A;
+					MemDoublingX <= DATA_Curve_GX; --APX
+					MemDoublingY <= DATA_Curve_GY; --APY
+				else
+					if (APM_TERMINAL = '1') then
+						STABILITY_Generate_Key_Public <= '1';
 						StableOutput <= '1';
 						DATABUSIN <= DSA_U & DSA_V; --DATA_Key_Public_User_X --DATA_Key_Public_User_Y
 						OP_PHASELOCK <= "00";
@@ -721,19 +1524,39 @@ begin
 				end if;
 			elsif ((Command(1) and Command(0)) = '1') then
 			--011: ECDH
+				SGA_PHASELOCK <= '0';
+				SVA_PHASELOCK <= '0';
 				if (not (Command_Previous = Command)) then
 					Error <= "0000";
 					StableOutput <= '0';
-				else
+					STABILITY_ECDH <= '0';
+					--Inputs to the APM: Initiate
+					APM_PHASELOCK <= '1';
+					JPM_PHASELOCK <= '1';
+					APM_TERMINAL <= '0';
+					StableOutputJPM <= '0';
+					--Inputs to the JPM: Initiate
+					MemDoublingZ <= UnitVector;
+					MemAddingX <= UnitVector;
+					MemAddingY <= UnitVector;
+					MemAddingZ <= ZeroVector;
+					MemNonceX <= UnitVector;
+					MemNonceY <= UnitVector;
+					MemNonceZ <= ZeroVector;
+					Jindex <= UnitVector;
+					JComplete <= ZeroVector;
+					Jnext <= UnitVector((N-2) downto 0) & "0";
+					CLKDBL <= '0';
+					J_Finished <= '0';
+					--Inputs to the APM: Select
 					PM_KEY <= DATA_Key_Private;
-					PM_APX <= DATA_Key_Public_Other_X;
-					PM_APY <= DATA_Key_Public_Other_Y;
-					DSA_U <= PM_AQX; --DATA_Key_Shared_X
-					DSA_V <= PM_AQY; --DATA_Key_Shared_X
-					PM_Modulus <= DATA_Curve_Prime;
-					PM_ECC_A <= DATA_Curve_A;
-					STABILITY_ECDH <= PM_StableOutput;
-					if (STABILITY_ECDH = '1') then
+					PM_MOD <= DATA_Curve_Prime;
+					PM_ECA <= DATA_Curve_A;
+					MemDoublingX <= DATA_Key_Public_Other_X; --APX
+					MemDoublingY <= DATA_Key_Public_Other_Y; --APY
+				else
+					if (APM_TERMINAL = '1') then
+						STABILITY_ECDH <= '1';
 						StableOutput <= '1';
 						DATABUSIN <= DSA_U & DSA_V; --DATA_Key_Public_User_X --DATA_Key_Public_User_Y
 						OP_PHASELOCK <= "00";
@@ -743,513 +1566,82 @@ begin
 		elsif (((not Command(3)) and Command(2)) = '1') then
 			if (((not Command(1)) and (not Command(0))) = '1') then
 			--100: HASH
+				SGA_PHASELOCK <= '0';
+				SVA_PHASELOCK <= '0';
 				--Functionality not Implemented, Left as skeleton
 				--STABILITY_HASH <= $Stability Output of HASH$;
 			elsif (((not Command(1)) and Command(0)) = '1') then
 			--101: Generate Signature_K; PRNG(1,(N-1))
+				SGA_PHASELOCK <= '0';
+				SVA_PHASELOCK <= '0';
 				--Functionality not Implemented, Left as skeleton
 				--STABILITY_Generate_Signature_K <= $Stability Output of PRNG$;
 			elsif ((Command(1) and (not Command(0))) = '1') then
 			--110: ECDSA-SGA
-				STABILITY_ECDSA_SVA <= '0';
-				--Implement ECDSA-SGA
-				if (not (Command_Previous = Command)) then
+				
+				if (not (Command_Previous = Command)) then 
+					SVA_PHASELOCK <= '0';
+					STABILITY_ECDSA_SVA <= '0';
+					--Prepare ECDSA registers
 					STABILITY_ECDSA_ROUNDS <= (others => '0');
 					Error <= "0000";
 					StableOutput <= '0';
-				elsif (STABILITY_ECDSA_ROUNDS(15) = '1') then
-					--Assert Signature_S != 0 (Recompute Signature_K otherwise)
-					--CAPTURE OUTPUTS
-					if ((not SIGNATURE_STABLE) = '1') then --for 'Not' Equal ZeroVector
-						STABILITY_ECDSA_SGA <= '1';
-						DATABUSIN <= Signature_R & DSA_U; --DATA_Signature_R --DATA_Signature_S
-						OP_PHASELOCK <= "00";
-						CLK_QUAD <= "00";
-						StableOutput <= '1';
-					else
-						Error <= "1001"; --1001: Invalid SGA Attempt: Signature_K prompts Signature_S = 0 (Error Flag: IRQ requests new Signature_K)
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(14) = '1') then
-					--Assert Signature_S != 0 (Recompute Signature_K otherwise)
-					--SETUP INPUTS
-					SIGNATURE_STABLILITY_CHECK <= DSA_U;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(15) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(13) = '1') then
-					--Compute (MULT) Signature_S = (Signature_K * (E + (Key_Private * Signature_R))) mod Curve_N
-					--CAPTURE OUTPUTS
-					if ((DSA_MULTU_STABLE) = '1') then
-						DSA_U <= DSA_MULTU_P; --DSA_U now contains Signature_S
-						STABILITY_ECDSA_ROUNDS(14) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(12) = '1') then
-					--Compute (MULT) Signature_S = (Signature_K * (E + (Key_Private * Signature_R))) mod Curve_N
-					--SETUP INPUTS
-					DSA_MULTU_A <= DSA_INVERSE;
-					DSA_MULTU_B <= DSA_W;
-					DSA_MULTU_M <= DATA_Curve_N;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(13) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(11) = '1') then
-					--Compute (ADDR) (E + (Key_Private * Signature_R)) mod Curve_N
-					--CAPTURE OUTPUTS
-					DSA_W <= DSA_ADDRW_S; --DSA_W is now (E + (Key_Private * Signature_R))
-					STABILITY_ECDSA_ROUNDS(12) <= '1';
-					CLK_QUAD <= "00";
-				elsif (STABILITY_ECDSA_ROUNDS(10) = '1') then
-					--Compute (ADDR) (E + (Key_Private * Signature_R)) mod Curve_N
-					--SETUP INPUTS
-					DSA_ADDRW_A <= DATA_HASH_Total;
-					DSA_ADDRW_B <= DSA_V;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(11) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(9) = '1') then
-					--Compute (MULT) (Key_Private * Signature_R) mod Curve_N
-					--CAPTURE OUTPUTS
-					if ((DSA_MULTV_STABLE) = '1') then
-						DSA_V <= DSA_MULTV_P;
-						STABILITY_ECDSA_ROUNDS(10) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(8) = '1') then
-					--Compute (MULT) (Key_Private * Signature_R) mod Curve_N
-					--SETUP INPUTS
-					DSA_MULTV_A <= DATA_Key_Private;
-					DSA_MULTV_B <= SIGNATURE_R;
-					DSA_MULTV_M <= DATA_Curve_N;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(9) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(7) = '1') then
-					--Assert Signature_R != 0 (Recompute Signature_K otherwise)
-					--CAPTURE OUTPUTS
-					if ((not SIGNATURE_STABLE) = '1') then --for 'Not' Equal ZeroVector
-						STABILITY_ECDSA_ROUNDS(8) <= '1';
-						SIGNATURE_R <= DSA_W;
-						CLK_QUAD <= "00";
-					else
-						Error <= "1000"; --1000: Invalid SGA Attempt: Signature_K prompts Signature_R = 0 (Error Flag: IRQ requests new Signature_K)
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(6) = '1') then
-					--Assert Signature_R != 0 (Recompute Signature_K otherwise)
-					--SETUP INPUTS
-					SIGNATURE_STABLILITY_CHECK <= DSA_W;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(7) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(5) = '1') then
-					--Compute Signature_R = (Signature_K * G).X mod Curve_N
-					--CAPTURE OUTPUTS
-					DSA_W <= DSA_ADDRW_S; --DSA_W is now Signature_R
-					STABILITY_ECDSA_ROUNDS(6) <= '1';
-					CLK_QUAD <= "00";
-				elsif (STABILITY_ECDSA_ROUNDS(4) = '1') then
-					--Compute Signature_R = (Signature_K * G).X mod Curve_N
-					--SETUP INPUTS
-					DSA_ADDRW_A <= DSA_PM_ByG_X;
-					DSA_ADDRW_B <= ZeroVector;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(5) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(3) = '1') then
-					--Compute 1 PM (over Curve) of (Signature_K * G)
-					--CAPTURE OUTPUTS
-					if (PM_StableOutput = '1') then
-						DSA_PM_ByG_X <= PM_AQX;
-						DSA_PM_ByG_Y <= PM_AQY;
-						STABILITY_ECDSA_ROUNDS(4) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(2) = '1') then
-					--Compute 1 PM (over Curve) of (Signature_K * G)
-					--SETUP INPUTS
-					PM_KEY <= DATA_Signature_K;
-					PM_APX <= DATA_Curve_GX;
-					PM_APY <= DATA_Curve_GY;
-					PM_Modulus <= DATA_Curve_Prime;
-					PM_ECC_A <= DATA_Curve_A;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(3) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(1) = '1') then
-					--Compute Inverse (over Curve_N) of Signature_K
-					--CAPTURE OUTPUTS
-					if (INV_INVERSE_STABLE = '0') then
-						DSA_INVERSE <= INV_INVERSE;
-						STABILITY_ECDSA_ROUNDS(2) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(0) = '1') then
-					--Compute Inverse (over Curve_N) of Signature_K
-					--SETUP INPUTS
-					INV_ELEMENT <= DATA_Signature_K;
-					INV_MODULUS <= DATA_Curve_N;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(1) <= '1';
-					end if;
-				else
-					--Take E from DATA_HASH_Total
-					--Take Signature_K from DATA_Signature_K
-					CLK_QUAD <= "00";
-					STABILITY_ECDSA_ROUNDS(0) <= '1';
+					--Switch on the SGA algorithm
+					SGA_PHASELOCK <= '1';
+					SGA_TERMINAL <= '0';
 				end if;
 			elsif ((Command(1) and Command(0)) = '1') then
 			--111: ECDSA_SVA
-				STABILITY_ECDSA_SGA <= '0';
-				--Implement ECDSA-SVA
-				if (not (Command_Previous = Command)) then
+				if (not (Command_Previous = Command)) then 
+					SGA_PHASELOCK <= '0';
+					STABILITY_ECDSA_SGA <= '0';
+					--Prepare ECDSA registers
 					STABILITY_ECDSA_ROUNDS <= (others => '0');
 					StableOutput <= '0';
 					Error <= "0000";
 					SIGNATURE_VERIFIED <= '0';
-				elsif (STABILITY_ECDSA_ROUNDS(21) = '1') then
-					--Assert that r = w (if yes, then success)
-					--CAPTURE OUTPUTS
-					SIGNATURE_VERIFIED <= SIGNATURE_VERIFY;
-					STABILITY_ECDSA_SVA <= '1';
-					StableOutput <= '1';
-					if (SIGNATURE_VERIFY = '0') then
-						Error <= "1100"; --1100: Invalid SVA Attempt: Signature is Invalid (Message Flag)
-					else
-						Error <= "1101"; --1101: Valid SVA Attempt: Signature is valid (Message Flag)
-					end if;
-					CLK_QUAD <= "00";
-				elsif (STABILITY_ECDSA_ROUNDS(20) = '1') then
-					--Assert that r = w (if yes, then success)
-					--SETUP INPUTS
-					--Inputs are fixed to the DSA_W and DATA_Signature_R registers, hold one round of the STABILITY_ECDSA to let Relator stabilise
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(21) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(19) = '1') then
-					--Compute w = (uG+vQ).X mod Curve_N
-					--CAPTURE OUTPUTS
-					DSA_W <= DSA_ADDRW_S;
-					STABILITY_ECDSA_ROUNDS(20) <= '1';
-					CLK_QUAD <= "00";
-				elsif (STABILITY_ECDSA_ROUNDS(18) = '1') then
-					--Compute w = (uG+vQ).X mod Curve_N
-					--SETUP INPUTS
-					DSA_ADDRW_A <= DSA_U;
-					DSA_ADDRW_B <= ZeroVector;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(19) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(17) = '1') then
-					--Compute APX and APY (over Curve) between uG and vQ
-					--CAPTURE OUTPUTS
-					if ((DSA_MULTV_STABLE and DSA_MULTU_STABLE) = '1') then
-						DSA_V <= DSA_MULTV_P; --DSA_V now contains APY
-						DSA_U <= DSA_MULTU_P; --DSA_U now contains APX
-						STABILITY_ECDSA_ROUNDS(18) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(16) = '1') then
-					--Compute APX and APY (over Curve) between uG and vQ
-					--SETUP INPUTS
-					DSA_MULTU_A <= DSA_JQX;
-					DSA_MULTU_B <= DSA_JQZ_INV_SQUARED;
-					DSA_MULTU_M <= DATA_Curve_Prime;
-					DSA_MULTV_A <= DSA_JQY;
-					DSA_MULTV_B <= DSA_JQZ_INV_CUBED;
-					DSA_MULTV_M <= DATA_Curve_Prime;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(17) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(15) = '1') then
-					--Compute JPZ_INV_CUBED (over Curve) between uG and vQ
-					--CAPTURE OUTPUTS
-					if ((DSA_MULTV_STABLE) = '1') then
-						DSA_JQZ_INV_CUBED <= DSA_MULTV_P;
-						STABILITY_ECDSA_ROUNDS(16) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(14) = '1') then
-					--Compute JPZ_INV_CUBED (over Curve) between uG and vQ
-					--SETUP INPUTS
-					DSA_MULTV_A <= DSA_JQZ_INV;
-					DSA_MULTV_B <= DSA_JQZ_INV_SQUARED;
-					DSA_MULTV_M <= DATA_Curve_Prime;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(15) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(13) = '1') then
-					--Compute JPZ_INV_SQUARED (over Curve) between uG and vQ
-					--CAPTURE OUTPUTS
-					if ((DSA_MULTU_STABLE) = '1') then
-						DSA_JQZ_INV_SQUARED <= DSA_MULTU_P;
-						STABILITY_ECDSA_ROUNDS(14) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(12) = '1') then
-					--Compute JPZ_INV_SQUARED (over Curve) between uG and vQ
-					--SETUP INPUTS
-					DSA_MULTU_A <= DSA_JQZ_INV;
-					DSA_MULTU_B <= DSA_JQZ_INV;
-					DSA_MULTU_M <= DATA_Curve_Prime;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(13) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(11) = '1') then
-					--Compute JPZ_INV (over Curve) between uG and vQ
-					--CAPTURE OUTPUTS
-					if (INV_INVERSE_STABLE = '0') then
-						DSA_JQZ_INV <= INV_INVERSE;
-						STABILITY_ECDSA_ROUNDS(12) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(10) = '1') then
-					--Compute JPZ_INV (over Curve) between uG and vQ
-					--SETUP INPUTS
-					INV_ELEMENT <= DSA_JQZ;
-					INV_MODULUS <= DATA_Curve_Prime;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(11) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(9) = '1') then
-					--Compute JPA (over Curve) between uG and vQ
-					--CAPTURE OUTPUTS
-					if (DSA_JPA_STABLE = '1') then 
-						DSA_JQX <= DSA_JPA_JQX;
-						DSA_JQY <= DSA_JPA_JQY;
-						DSA_JQZ <= DSA_JPA_JQZ;
-						STABILITY_ECDSA_ROUNDS(10) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(8) = '1') then
-					--Compute JPA (over Curve) between uG and vQ
-					--SETUP INPUTS
-					--Inputs are fixed to the DSA_PM registers, hold one round of the STABILITY_ECDSA to let JPA stabilise
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(9) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(7) = '1') then
-					--Compute PM (over Curve) of vQ (Q, the persons public key)
-					--CAPTURE OUTPUTS
-					if (PM_StableOutput = '1') then
-						DSA_PM_ByQ_X <= PM_AQX;
-						DSA_PM_ByQ_Y <= PM_AQY;
-						STABILITY_ECDSA_ROUNDS(8) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(6) = '1') then
-					--Compute PM (over Curve) of vQ (Q, the persons public key)
-					--SETUP INPUTS
-					PM_KEY <= DSA_V; --V = ((S Inverse) * R)
-					PM_APX <= DATA_Key_Public_Other_X;
-					PM_APY <= DATA_Key_Public_Other_Y;
-					PM_Modulus <= DATA_Curve_Prime;
-					PM_ECC_A <= DATA_Curve_A;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(7) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(5) = '1') then
-					--Compute PM (over Curve) of uG
-					--CAPTURE OUTPUTS
-					if (PM_StableOutput = '1') then
-						DSA_PM_ByG_X <= PM_AQX;
-						DSA_PM_ByG_Y <= PM_AQY;
-						STABILITY_ECDSA_ROUNDS(6) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(4) = '1') then
-					--Compute PM (over Curve) of uG
-					--SETUP INPUTS
-					PM_KEY <= DSA_U; --U = ((S Inverse) * Hash)
-					PM_APX <= DATA_Curve_GX;
-					PM_APY <= DATA_Curve_GY;
-					PM_Modulus <= DATA_Curve_Prime;
-					PM_ECC_A <= DATA_Curve_A;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(5) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(3) = '1') then
-					--Compute 2 MULTS (over Curve_N) of u(Signature_S_Inv * E) and v(Signature_S_Inv * Signature_R)
-					--CAPTURE OUTPUTS
-					if ((DSA_MULTV_STABLE and DSA_MULTU_STABLE) = '1') then
-						DSA_U <= DSA_MULTU_P; --U = ((S Inverse) * Hash)
-						DSA_V <= DSA_MULTV_P; --V = ((S Inverse) * R)
-						STABILITY_ECDSA_ROUNDS(4) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(2) = '1') then
-					--Compute 2 MULTS (over Curve_N) of u(Signature_S_Inv * E) and v(Signature_S_Inv * Signature_R)
-					--SETUP INPUTS
-					DSA_MULTV_A <= DSA_INVERSE;
-					DSA_MULTV_B <= DATA_Signature_R;
-					DSA_MULTV_M <= DATA_Curve_N;
-					DSA_MULTU_A <= DSA_INVERSE;
-					DSA_MULTU_B <= DATA_HASH_Total;
-					DSA_MULTU_M <= DATA_Curve_N;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(3) <= '1';
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(1) = '1') then
-					--Compute Inverse (over Curve_N) of Signature_S
-					--CAPTURE OUTPUTS
-					if (INV_INVERSE_STABLE = '0') then
-						DSA_INVERSE <= INV_INVERSE;
-						STABILITY_ECDSA_ROUNDS(2) <= '1';
-						CLK_QUAD <= "00";
-					end if;
-				elsif (STABILITY_ECDSA_ROUNDS(0) = '1') then
-					--Compute Inverse (over Curve_N) of Signature_S
-					--SETUP INPUTS
-					INV_ELEMENT <= DATA_Signature_S;
-					INV_MODULUS <= DATA_Curve_N;
-					if (CLK_QUAD = "00") then
-						CLK_QUAD <= "01";
-					elsif (CLK_QUAD = "01") then
-						CLK_QUAD <= "10";
-					elsif (CLK_QUAD = "10") then
-						CLK_QUAD <= "11";
-					else
-						STABILITY_ECDSA_ROUNDS(1) <= '1';
-					end if;
-				else
-					--Take E from DATA_HASH_Total
-					--Take Signature_R from DATA_Signature_R
-					--Take Signature_S from DATA_Signature_S
-					if (DATA_Signature_R = ZeroVector) then
-						Error <= "1010"; --1010: Invalid SVA Attempt: Signature_R is 0 (Error Flag: IRQ requests Signature rewrite)
-					elsif (DATA_Signature_S = ZeroVector) then
-						Error <= "1011"; --1011: Invalid SVA Attempt: Signature_S is 0 (Error Flag: IRQ requests Signature rewrite)
-					else
-						CLK_QUAD <= "00";
-						STABILITY_ECDSA_ROUNDS(0) <= '1';
-					end if;
+					--Switch on the SVA algorithm
+					SVA_PHASELOCK <= '1';
+					SVA_TERMINAL <= '0';
 				end if;
 			end if;
 		elsif (Command(3) = '1') then
+			SGA_PHASELOCK <= '0';
+			SVA_PHASELOCK <= '0';
 			if (Command(2) = '1') then
 				if (Command(1) = '1') then
 					if (Command(0) = '1') then
 						--Command "1111": Error Check: Curve Parameters; (N*(GX,GY) = infinity)
 						if (not (Command_Previous = Command)) then
 							Error <= "0000";
-						else
+							--Inputs to the APM: Initiate
+							APM_PHASELOCK <= '1';
+							JPM_PHASELOCK <= '1';
+							APM_TERMINAL <= '0';
+							StableOutputJPM <= '0';
+							--Inputs to the JPM: Initiate
+							MemDoublingZ <= UnitVector;
+							MemAddingX <= UnitVector;
+							MemAddingY <= UnitVector;
+							MemAddingZ <= ZeroVector;
+							MemNonceX <= UnitVector;
+							MemNonceY <= UnitVector;
+							MemNonceZ <= ZeroVector;
+							Jindex <= UnitVector;
+							JComplete <= ZeroVector;
+							Jnext <= UnitVector((N-2) downto 0) & "0";
+							CLKDBL <= '0';
+							J_Finished <= '0';
+							--Inputs to the APM: Select
 							PM_KEY <= DATA_Curve_N;
-							PM_APX <= DATA_Curve_GX;
-							PM_APY <= DATA_Curve_GY;
-							DSA_U <= PM_AQX;
-							DSA_V <= PM_AQY;
-							PM_Modulus <= DATA_Curve_Prime;
-							PM_ECC_A <= DATA_Curve_A;
-							STABILITY_Generate_Key_Public <= PM_StableOutput;
-							if (STABILITY_Generate_Key_Public = '1') then
+							PM_MOD <= DATA_Curve_Prime;
+							PM_ECA <= DATA_Curve_A;
+							MemDoublingX <= DATA_Curve_GX; --APX
+							MemDoublingY <= DATA_Curve_GY; --APY
+						else
+							if (APM_TERMINAL = '1') then
 								StableOutput <= '1';
+								OP_PHASELOCK <= "00";
 								if ((DSA_U or DSA_V) = ZeroVector) then
 									Error <= "0000";
 								else
@@ -1305,10 +1697,11 @@ begin
 				end if;
 			end if;
 		end if;
-		Command_Previous <= Command;
+		if ((RW_PHASELOCK = "11") and (OP_PHASELOCK = "11")) then
+			Command_Previous <= Command;
+		end if;
 	end if;
 end process;
-
 
 end Behavioral;
 

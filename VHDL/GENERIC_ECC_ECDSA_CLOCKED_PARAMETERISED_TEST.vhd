@@ -61,21 +61,52 @@ ARCHITECTURE behavior OF GENERIC_ECC_ECDSA_CLOCKED_PARAMETERISED_TEST IS
 			--1010: HASH_Total [(N-1) downto 0]
 			--		  A register that can hold a precomputed hash value
 			--1011: HASH_Input [((2*N)-1) downto 0]
+			--1100: -
+			--1101: -
+			--1110: -
+			--1111: -
          OtherUserRegister : IN  std_logic_vector(3 downto 0);
+			--Indicates to the ECDH, Public and Shared Key registers what user is being flagged. 
          HashStrobeIn : IN  std_logic_vector(1 downto 0);
+			--Indicates to the HASH next input is ready (0), or that the the Last input is ready (1)
          HashStrobeOut : OUT  std_logic;
-         Command : IN  std_logic_vector(2 downto 0);
-			--000: Not operating anything, In RW mode
-			--001: Generate Key_Private; PRNG(1,(N-1))
-			--010: Generate Key_Public
-			--011: ECDH
-			--100: HASH
-			--101: Generate Signature_K; PRNG(1,(N-1))
-			--110: ECDSA-SGA
-			--111: ECDSA_SVA
+			--Used by the HASH to request the next input
+         Command : IN  std_logic_vector(3 downto 0);
+			--0000: Not operating anything, In RW mode
+			--0001: Generate Key_Private; PRNG(1,(N-1))
+			--0010: Generate Key_Public
+			--0011: ECDH
+			--0100: HASH
+			--0101: Generate Signature_K; PRNG(1,(N-1))
+			--0110: ECDSA-SGA
+			--0111: ECDSA_SVA
+			--1000: 
+			--1001: 
+			--1010: 
+			--1011: 
+			--1100: 
+			--1101: 
+			--1110: 
+			--1111:
          CLK : IN  std_logic;
          StableOutput : OUT  std_logic;
          Error : OUT  std_logic_vector(3 downto 0)
+			--0000: Default (Nothing Wrong) (Note Flag)
+			--0001: Illegal Read Attempt Private Key flushed to Databus (Attack Flag: Flush 'Z' Drive recommended)
+			--0010: Invalid Curve Parameter: (N*(GX,GY) != infinity) (Error Flag: IRQ recommended)
+			--0011: Invalid Curve Parameter: ((4*A^3 + 27*B^2) mod Prime = 0) (Critical Error Flag: IRQ Mandatory)
+			--0100: Illegal Write Attempt: User's Public Key (Warning Flag [should use Generate Key_Public command])
+			--0101: Illegal Write Attempt: Shared Key (Warning Flag [should use ECDH command])
+			--0110: Invalid Public Key: Other's (Error Flag: IRQ Recommended)
+			--0111: 
+			--1000: Invalid SGA Attempt: Signature_K prompts Signature_R = 0 (Error Flag: IRQ requests new Signature_K)
+			--1001: Invalid SGA Attempt: Signature_K prompts Signature_S = 0 (Error Flag: IRQ requests new Signature_K)
+			--1010: Invalid SVA Attempt: Signature_R is 0 (Error Flag: IRQ requests Signature rewrite)
+			--1011: Invalid SVA Attempt: Signature_S is 0 (Error Flag: IRQ requests Signature rewrite)
+			--1100: Invalid SVA Attempt: Signature is Invalid (Message Flag)
+			--1101: Valid SVA Attempt: Signature is valid (Message Flag)
+			--1110: 
+			--1111: 
         );
     END COMPONENT;
     
@@ -85,7 +116,7 @@ ARCHITECTURE behavior OF GENERIC_ECC_ECDSA_CLOCKED_PARAMETERISED_TEST IS
    signal LacthToReadFrom : std_logic_vector(3 downto 0) := (others => '0');
    signal OtherUserRegister : std_logic_vector(3 downto 0) := (others => '0');
    signal HashStrobeIn : std_logic_vector(1 downto 0) := "00";
-   signal Command : std_logic_vector(2 downto 0) := (others => '0');
+   signal Command : std_logic_vector(3 downto 0) := (others => '0');
    signal CLK : std_logic := '0';
 
 	--BiDirs
@@ -146,7 +177,7 @@ BEGIN
    -- Stimulus process
    stim_proc: process
    begin		
-      Command <= "000";
+      Command <= "0000";
 		RW <= '0';
 		--Write the Prime and A
 		LacthToReadFrom <= "0000";
@@ -195,11 +226,11 @@ BEGIN
 		DATABUS <= (others => 'Z');
 		--Compute the user's public key
 		wait for CLK_period*(VecLen*3);
-		Command <= "010";
+		Command <= "0010";
 		wait for CLK_period*(VecLen*250);
 		--Read out the user's public key
 		wait for CLK_period*(VecLen*3);
-		Command <= "000";
+		Command <= "0000";
 		LacthToReadFrom <= "0101";
 		RW <= '0';
 		wait for CLK_period*(VecLen*2);
@@ -207,11 +238,11 @@ BEGIN
 		Key_Public_User_Y <= DATABUS((VecLen-1) downto 0);
 		--Compute the shared key
 		wait for CLK_period*(VecLen*3);
-		Command <= "011";
+		Command <= "0011";
 		wait for CLK_period*(VecLen*250);
 		--Read out the shared key
 		wait for CLK_period*(VecLen*3);
-		Command <= "000";
+		Command <= "0000";
 		LacthToReadFrom <= "0111";
 		RW <= '0';
 		wait for CLK_period*(VecLen*2);
@@ -237,11 +268,11 @@ BEGIN
 		DATABUS <= (others => 'Z');
 		--Compute the signature for the HASH, Private Key, and Signature_K
 		wait for CLK_period*(VecLen*3);
-		Command <= "110";
+		Command <= "0110";
 		wait for CLK_period*(VecLen*600);
 		--Read out the shared key
 		wait for CLK_period*(VecLen*3);
-		Command <= "000";
+		Command <= "0000";
 		LacthToReadFrom <= "1000";
 		RW <= '0';
 		wait for CLK_period*(VecLen*2);
@@ -249,7 +280,7 @@ BEGIN
 		Signature_S <= DATABUS((VecLen-1) downto 0);
 		--Read out the user's public key to the "other's public key"
 		wait for CLK_period*(VecLen*3);
-		Command <= "000";
+		Command <= "0000";
 		LacthToReadFrom <= "0101";
 		RW <= '0';
 		wait for CLK_period*(VecLen*2);
@@ -266,7 +297,7 @@ BEGIN
 		DATABUS <= (others => 'Z');
 		--Verify the signature for the "other's public key" (now the user's public key), the HASH, and the signature pair (r,s)
 		wait for CLK_period*(VecLen*3);
-		Command <= "111";
+		Command <= "0111";
 		wait for CLK_period*(VecLen*800);
 		
       wait;
